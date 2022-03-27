@@ -1,0 +1,975 @@
+<html>
+<head>
+<title>InfiMine</title>
+<style>
+table.minefield tr td:hover {
+	/*background-color: steelblue;*/
+	border: 1px solid lightcyan;
+	border-style: inset;
+	cursor: pointer;
+}
+
+table.minefield {
+	border: 1px solid black;
+	border-radius: 5px;
+	background-color: white;
+}
+
+table.noplay {
+	background-color: lightgray;
+}
+
+table.minefield tr {
+	height: 25px;
+}
+
+table.minefield tr td {
+    width: 23px;
+    max-width: 23px;
+	height: 25px;
+	max-height: 25px;
+    text-align:center;
+	border: 1px solid black;
+	border-radius: 5px;
+	border-style: outset;
+}
+
+.cell {
+	font-weight: 900;
+}
+
+.color0 {
+  color: white;
+}
+
+.color1 {
+  color: #4E6C85;
+}
+.color2 {
+  color: #53A553;
+}
+.color3 {
+  color: #DF4522;
+}
+.color4 {
+  color: #726C8C;
+}
+.color5 {
+  color: #884631;
+}
+.color6 {
+  color: #9DB8D2;
+}
+.color7 {
+  color: Magenta;
+}
+.color8 {
+  color: Gold;
+}
+.color9 {
+  color: Black;
+}
+
+.mark {
+  color: Black;
+  background-color: orange;
+}
+
+.bomb {
+  color: Black;
+  background-color: silver; /*red;*/
+}
+
+.shadow {
+  color: Black;
+  background-color: lightgray;
+}
+
+.marker-on {
+  background-color: orange;
+}
+
+.cell.noplay {
+	background-color: gray;
+	border-color: white;
+}
+
+/* controls */
+/*
+table.move {
+	height: 100%;
+}
+*/
+
+table.move tr {
+	height: 100%;
+}
+
+table.move tr td {
+	height: 100%;
+    text-align:center;
+	border: 1px solid black;
+	border-radius: 5px;
+	border-style: outset;
+	cursor: pointer;
+}
+
+.conftabcontent {
+  display: none;
+}
+
+</style>
+</head>
+<body>
+<div id="infimine"></div>
+</body>
+<script>
+
+const infimine = (function() {
+	var game = {};
+	var mainProps = {};
+	
+	function Cell(props={}) {
+		
+		isOpen = props['isOpen']===true?true:false;
+		hasBomb  = props['hasBomb']!==undefined?props['hasBomb']:(Math.random()<getBombDensity());
+		bombCount  = props['bombCount'];
+		
+		return {
+			'isOpen': isOpen,
+			'hasBomb': hasBomb,
+			'bombCount': bombCount,
+			'hasMark': false
+		}
+	}
+	
+	function initDefinition() {
+		var defaultLives = 3;
+		/* game definition */
+		var g = {
+			bombDensity: (mainProps['bombDensity']!==undefined)?mainProps['bombDensity']:0.2063, //(() => { return 0.2063; }),//0.2063, //0.1563; 1/8.; //1/16.;
+			canOpenNeighbours: (mainProps['canOpenNeighbours']===false)?false:true,  //bool
+			defaultLives: (mainProps['defaultLives']!==undefined && mainProps['defaultLives']>0)?mainProps['defaultLives']:defaultLives, //null -> infinite - int
+			spaceSize: (mainProps['spaceSize']!==undefined)?mainProps['spaceSize']:[16,16], //[16,20,5], //() => { return [16,20]},  //[16,30], //[5,7], //[8,6], //[[0,8],[0,6]],  //[5,-1]   //>0 - bounded; <0 - cyclic; 0/null - unbounded - array or func
+			fixedBombs: (mainProps['fixedBombs']!==undefined && mainProps['fixedBombs']>0)?mainProps['fixedBombs']:null, //null, //fixed number of bombs - int>0
+			
+		}
+	
+		return g;
+	}
+	
+	function initValues() {
+		var viewSize = game.spaceSize.slice(0,2).map(x => x!=0?(Math.abs(x)+2):16); //[18,18]; //[5,4], //[16, 30], //16/16  8/8    10/8 
+		if (viewSize[0]>25) viewSize[0] = 25;
+		if (viewSize[1]>45) viewSize[1] = 45;
+
+		var viewCenter = initViewCenter(viewSize);
+		var currDimCoord = game.spaceSize.map(x => 0);
+		/* game values */
+		var g = {
+			field: {},
+			viewSize: (mainProps['viewSize']!==undefined)?mainProps['viewSize']:viewSize,
+			viewCenter: (mainProps['viewCenter']!==undefined)?mainProps['viewCenter']:viewCenter,
+			viewDim: [0,1], //check?
+			currDimCoord: currDimCoord, 
+
+			inGame: 0,
+			lives: game?game.defaultLives:null, //null
+			markOnClick: false, 
+			clickCount: 0,
+			showConf: false,
+		}
+		return g;
+	}
+	
+	function getKeyFromStrKey(sk) {
+		return game.viewDim.map(i => sk.split('|').map(Number)[i]);
+	}
+	function getStrKeyFromKey(k) {
+		var kr = game.currDimCoord.map((v,i) => game.viewDim.find(j => j===i)>=0?k[game.viewDim.findIndex(j => j===i)]:v);
+		var kn = normalizeCoordinates(kr);
+		if (kn===null) return null;
+		return kn.reduce((p,n)=>p+'|'+n);
+	}
+	
+	function normalizeCoordinates(p) {
+		var currSpaceSize = game.spaceSize;
+		for (var i in p) {
+			if (currSpaceSize[i]>0) {
+				//bounded
+				if (p[i]<0) return null;
+				if (p[i]>=currSpaceSize[i]) return null;
+			} else if (currSpaceSize[i]<0) {
+				//cyclic
+				p[i] =  ((p[i] % currSpaceSize[i]) + currSpaceSize[i]) % currSpaceSize[i];
+			}
+			// else (0, null) -> infinite
+		}
+		return p;
+	}
+	
+	function getCell(sk, canBomb=true) {
+		props = {};
+		if (!canBomb) props['hasBomb'] = false;
+		if (!(sk in game.field)) { game.field[sk] = Cell(props) };
+
+		return game.field[sk];
+	}
+	
+	function getResult() {
+		if (!game) return null;
+		var b = Object.keys(game.field).filter(i => { return (game.field[i]['hasBomb']===true) }).length;
+		var bo = Object.keys(game.field).filter(i => { return (game.field[i]['isOpen']===true && game.field[i]['hasBomb']===true) }).length;
+		var m = Object.keys(game.field).filter(i => { return (game.field[i]['hasMark']===true) }).length;
+		var mp = Object.keys(game.field).filter(i => { return (game.field[i]['hasMark']===true && game.field[i]['hasBomb']===true) }).length;
+		var ccr = (m>0 && game.clickCount>0)?(game.clickCount/mp):Number.MAX_SAFE_INTEGER; //click count
+		
+		var lr = ((game.defaultLives>0)?(game.defaultLives-game.lives):0) + 1;
+		
+		var sc = (1000*ccr*Math.sqrt(lr*(bo+1))).toFixed(0);
+
+		return {score:sc, bombs:bo, marks:m};
+	}
+	
+	function getBombDensity() {
+		var dens = game.bombDensity;
+		if (game.fixedBombs>0 && game.spaceSize.filter(x => x===null || x===0).length===0) {
+			var s = Math.abs(game.spaceSize.reduce((x,y)=>(x*y)) - Object.keys(game.field).length);
+			if (s>0) {
+				var b = game.fixedBombs - Object.keys(game.field).filter(x => { return (game.field[x]['hasBomb']===true)}).length;
+				b = b>game.fixedBombs?game.fixedBombs:(b<0?0:b); //normalize
+				dens = b/s;
+				dens = dens>1?1:(dens<0?0:dens);
+			} else {
+				dens = 0; //no place left
+			}
+		}
+		game.bombDensity = dens;
+		return dens;
+	}
+	
+	function initViewCenter(viewSize) {
+		var viewDim = game.hasOwnProperty('viewDim')?game.viewDim:[0,1];
+		return [parseInt(game.spaceSize[viewDim[0]]/2) - parseInt(viewSize[viewDim[0]]/2), parseInt(game.spaceSize[viewDim[1]]/2) - parseInt(viewSize[viewDim[1]]/2)]; //[0,0];
+	}
+	
+	function getNeighbours(sk) {
+		var n = [];
+		const selViewCell = getKeyFromStrKey(sk); //from view
+		const selCell = game.currDimCoord;
+		selCell[game.viewDim[0]] = selViewCell[0];
+		selCell[game.viewDim[1]] = selViewCell[1];
+		
+		var tmp = [];
+		var N = selCell.length;
+		while (N--) tmp.push([-1,0,1]);
+		var ndc = tmp.reduce((a, b) => a.reduce((r, v) => r.concat(b.map(w => [].concat(v, w))), []));
+				
+		for (let e of ndc) {
+			var nc = selCell.map((s,i) => s + e[i]);
+			var k = getStrKeyFromKey(nc);
+			if (k==sk) continue;
+			if (k!==null) { n.push(k); }
+		}
+		
+		return n;
+	}
+	
+	function getCellBombCount(sk) {
+		var sumPoints = 0;
+		for (var nk of getNeighbours(sk)) {
+			var p = getCell(nk,game.inGame!==0);
+			if ('hasBomb' in p && p['hasBomb']===true) sumPoints += 1;
+		}
+		return sumPoints;
+	}
+	
+	function findCellCenterView() {
+		var k = Object.keys(game.field).filter(i => { return (game.field[i]['isOpen']===true || game.field[i]['hasMark']===true) });
+		if (k.length>0) {
+			var fe = k.sort().shift();
+			centerCell = getKeyFromStrKey(fe);
+			game.viewCenter = [centerCell[0] - parseInt(game.viewSize[0]/2), centerCell[1] - parseInt(game.viewSize[1]/2)]
+			updateView();	
+		}
+	}
+	
+	function openCell(sk) {
+		var o = getCell(sk, game.inGame!==0);
+
+		if (game.canOpenNeighbours===true && o['isOpen']===true && o['hasBomb']===false && o['bombCount']>=0) {
+			var c = 0;
+			var toOpen = [];
+			for (var nk of getNeighbours(sk)) {
+				var p = getCell(nk);
+				if ((p['isOpen']===true && p['hasBomb']===true) || p['hasMark']===true) c += 1;
+				if (p['isOpen']===false && p['hasMark']===false) toOpen.push(nk);
+			}
+			if (c===o['bombCount']) {
+				for (var nk of toOpen) {
+					openCell(nk);
+				}
+			}
+		}
+
+		if (o['isOpen']===false && o['hasMark']===false) {
+			o['bombCount'] = getCellBombCount(sk);
+			if (game.inGame===0) {
+				game.inGame = 1;
+			}
+			o['isOpen'] = true;
+			game.field[sk] = o;
+			
+			//neighbours
+			if (game.canOpenNeighbours===true && o['bombCount']===0) {
+				for (var nk of getNeighbours(sk)) {
+					openCell(nk);
+				}
+			}
+		}
+		return o;
+	}
+	
+	function changeMarkCell(sk) {
+		var o = getCell(sk, game.inGame!==0);
+		if (o['isOpen']===false) {
+			o['hasMark'] = !o['hasMark'];
+			game.field[sk] = o;
+		}
+	}
+	
+	function changeDim(d) {
+		if (!([0,1].includes(d))) return;
+		var o = game.viewDim[d];
+		for (let i=1;i<game.spaceSize.length;i++) {
+			var n = (o + i)%game.spaceSize.length;
+			if (n==o) break;
+			if (n==game.viewDim[(d + 1)%2]) continue;
+			game.viewDim[d] = n;
+			updateView();
+			break;
+		}
+	}
+	
+	function moveInDim(d) {
+		if (d>=0 && d<game.currDimCoord.length) {
+			game.currDimCoord[d] = (game.currDimCoord[d] + 1)%(game.spaceSize[d]);
+			updateView();
+		}
+	}
+
+
+	function buildView() {
+		var evtTemp = (game.inGame===2)?'':'onclick="infimine.clickCell(event,this)" oncontextmenu="infimine.onContextMenuEvent(event,this)"';
+		var s = '<table class="minefield '+((game.inGame===2)?'noplay':'')+'" oncontextmenu="infimine.onContextMenuEvent(event,this)">';
+		for (var r of [...Array(game.viewSize[0]).keys()].map(x => x + game.viewCenter[0])) {
+			s += '<tr>';
+			for (var c of [...Array(game.viewSize[1]).keys()].map(x => x + game.viewCenter[1])) {
+				sk = getStrKeyFromKey([r,c]);
+				vd = '';
+				cls = 'shadow';
+				var evt = evtTemp;
+				if (sk===null) {
+					cls = 'noplay';
+					evt = '';
+				} else if (sk in game.field) {
+					//if (field[sk]['isOpen']==true) vd = '.'; //vd += '.'
+					if (game.field[sk]['bombCount']!==undefined) {
+						vd = game.field[sk]['bombCount']>0?game.field[sk]['bombCount']:'';
+						cls = 'color'+game.field[sk]['bombCount'];
+					}
+					if (game.field[sk]['hasMark']==true && game.field[sk]['isOpen']==false) { vd = '&#9873;'; cls = 'mark'; };  //M  &#127987   &#128681 &#9873;
+					if (game.field[sk]['hasBomb']==true && game.field[sk]['isOpen']==true) { vd = '&#128165;'; cls = 'bomb'; }; //*  &#128163; &#128165;
+				}
+				s += '<td id="'+sk+'" class="cell '+cls+'" '+evt+'>&nbsp;'+vd+'&nbsp;</td>';
+			}	
+			s += '</tr>';
+		}
+		s += '</table>';
+		return s;
+	}
+	
+	function buildControls() {
+		var s = '<table class="move">' + 
+				'<tr>' +
+					'<td class="find" tooltip="Find/Center" onclick="infimine.findCellCenterView();">&#128270;</td>' +  //  &#10687;  &#128270;
+					'<td class="moveView moveUp" tooltip="Move up" onclick="infimine.moveViewBy(\'U\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e7;</td>' +  //U
+					'<td class="restart" tooltip="Restart" onclick="infimine.restart();">&#x21bb;</td>' +
+				'</tr>' +
+				'<tr>' +
+					'<td class="moveView moveLeft" tooltip="Move left" onclick="infimine.moveViewBy(\'L\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e6;</td>' +  //L
+					'<td>'+buildView()+'</td>' +
+					'<td class="moveView moveRight" tooltip="Move right" onclick="infimine.moveViewBy(\'R\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e8;</td>' +  //R
+				'</tr>' +
+				'<tr>' +
+					'<td class="marker marker-'+(game.markOnClick===true?'on':'off')+'" tooltip="Toggle open/mark" onclick="infimine.toggleMarker();">&#9873;</td>' +
+					'<td class="moveView moveDown" tooltip="Move down" onclick="infimine.moveViewBy(\'D\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e9;</td>' +  //D
+					'<td class="conf" tooltip="Configuration" onclick="infimine.toggleConfig();">&#9776;</button></td>' +
+				'<tr>' +
+			'</table>'; 
+	
+		return s;
+	}
+	
+	function buildInfo() {
+		var s = '<div>Mines</div>';
+		let gk = getGameKey();
+		let cg = parseGameKey(gk);
+		let fg = favoriteGames();
+		s += `<div>${templateItemGame(cg[0], cg[1], null, gk, (fg!=null && fg!==undefined && fg.indexOf(gk)>-1))}</div>`;
+		if (game.inGame===2) {
+			var r = getResult();
+			s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']})</div>`;
+		} else {
+			s += `<div>${((Object.keys(game.field).length>0)?'Running ...':'Click to start')}</div>`;
+		}
+		s += `<div>Lives left: ${((game.defaultLives>0)?((game.lives>=0)?game.lives:''):'&infin;')}</div>`;
+		s += `<div>Clicks: ${game.clickCount}</div>`;
+		return s;
+	}
+	
+	function templateItemGame(gName, gKey, gProps, gValue, isFav) {
+		let s = gName; 
+		if (gKey!==null && gKey!==undefined) {
+			s += ` <input type="button" name="newgame${gKey}" tooltip="New game" value="New game" onclick="infimine.newGame('${(gProps!==null && gProps!==undefined)?gProps:gKey}');">`; 
+		}
+		if (isFav!==null && isFav!==undefined) {
+			let ft = isFav?"Remove from Favorites":"Add to Favorites";
+			s += ` <input type="button" name="favtoggle${gKey}" tooltip="${ft}" value="${ft}" onclick="infimine.toggleFavoriteGame('${gValue}')">`; 
+		}
+		
+		return s;
+	}
+	
+	function buildConfig() {
+		var s = ''; 
+		if (game.showConf===true) {
+			/* https://www.w3schools.com/howto/howto_js_tabs.asp */
+			s += '<div id="conf">'; 
+			s += '<div class="conftab">';
+			s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfNewGame');" id="defaultConfTab">New Game</button>`;
+			s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfSaveLoad');">Save/Load</button>`;
+			s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfBestScore');">Best Score</button>`;
+			s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfPlayedGames');">Played Games</button>`;
+			s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfInfo');">Info</button>`;
+			s += '</div>';
+			s += '<div id="ConfNewGame" class="conftabcontent">';
+			s += '<h3>New Game</h3>'; 
+			s += '<p>'; 
+			s += '<h4>Favorites</h4>'; 
+			s += '<ul>';
+			let fg = favoriteGames();
+			if (fg) {
+				for (let q of fg) {
+					var g = parseGameKey(q);
+					s += '<li>'+templateItemGame(g[0], g[1], null, q, true)+'</li>';
+				}
+			}
+			s += '</ul>';
+			s += '<h4>Quick Start</h4>'; 
+			s += '<ul>';
+			for (let q of quickStartGames()) {
+				if (q) {
+					var qn = parseGameKey(q);
+					s += '<li>'+templateItemGame(qn[0], qn[1], null, null, null)+'</li>';
+				} else {
+					s += '<hr>';
+				}
+			}
+			s += '</ul>';
+			s += '<br>'; 
+			s += '<h4>My Game</h4>'; 
+			s += `<span>Space Height:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceHi" tooltip="infinite" ${game.spaceSize[0]==0?'checked':''}><br>`; 
+			s += `<input type="number" id="ngSpaceH" tooltip="Space height" value="${Math.abs(game.spaceSize[0])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceHc" tooltip="cyclic" ${game.spaceSize[0]<0?'checked':''}><br>`;
+			s += `<span>Space Width:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceWi" tooltip="infinite" ${game.spaceSize[0]==0?'checked':''}><br>`; 
+			s += `<input type="number" id="ngSpaceW" tooltip="Space width" value="${Math.abs(game.spaceSize[1])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceWc" tooltip="cyclic" ${game.spaceSize[1]<0?'checked':''}><br>`;
+			s += `Lives: <input type="number" id="ngLives" tooltip="Lives" value="${game.defaultLives}" min="0" max="5"><br>`;
+			s += `Bomb density (0-100%): <input type="number" id="ngBombDensity" tooltip="Bomb density" value="${(100*game.bombDensity).toFixed(2)}" min="0" max="99.99" step="0.01"><br>`;
+			s += `Bombs: <input type="number" id="ngBombs" tooltip="Bombs" value="${game.fixedBombs}" min="0"><br>`;
+			s += '<input type="button" name="mynewgame" tooltip="New game" value="New game" onclick="infimine.myNewGame();">';
+			s += '</p>'; 
+			s += '</div>';
+			s += '<div id="ConfSaveLoad" class="conftabcontent">';
+			s += '<h3>Save/Load</h3>'; 
+			s += '<p>'; 
+			s += '<input type="button" name="save" tooltip="Save the game" value="Save" onclick="infimine.save();">';
+			s += '<input type="button" name="load" tooltip="Load the game" value="Load" onclick="infimine.load();">';
+			s += '<br>';
+			s += '<input type="button" name="saveDisk" tooltip="Save the game to disk" value="Save To Disk" onclick="infimine.saveToDisk();">';
+			s += '<input type="button" name="loadDisk" tooltip="Load the game from disk" value="Load From Disk" onclick="infimine.loadFromDisk();">';
+			s += '<input type="file" id="loadDiskFile" name="loadDiskFile" tooltip="Choose the file from disk" value="infimine.save">';
+			s += '</p>'; 
+			s += '</div>';
+			s += '<div id="ConfBestScore" class="conftabcontent">';
+			s += '<h3>Best Score</h3>'; 
+			s += '<p>'; 
+			s += '<table><tr><td>Score</td><td>Date</td><tr>';
+			for (let i of getBestScoreList(getGameKey())) {
+				s += `<tr><td>${i[0]}</td><td>${(new Date(i[2])).toLocaleString()}</td><tr>`;
+			}
+			s += '</table>';
+			s += '<br><input type="button" name="resetScire" tooltip="Reste Score List" value="Reset Score List" onclick="infimine.resetBestScoreList();">';
+			s += '</p>'; 
+			s += '</div>';
+			s += '<div id="ConfPlayedGames" class="conftabcontent">';
+			s += '<h3>Played Games</h3>'; 
+			s += '<p>'; 
+			s += '<ul>'; 
+			for (let g of bestScoreListGames()) {
+				s += '<li>'+templateItemGame(g['name'], g['key'], g['props'], g['key'], (fg!=null && fg!==undefined && fg.indexOf(g['key'])>-1))+'</li>';
+			}
+			s += '</ul>'; 
+			s += '</p>'; 
+			s += '</div>';
+			s += '<div id="ConfInfo" class="conftabcontent">';
+			s += '<h3>Info</h3>'; 
+			s += '<p>'; 
+			s += '<h4>Instructions</h4>';
+			s += '<p>';
+			s += '<ul>';
+			s += '<li>Each game starts out with a grid of unmarked squares. After clicking one of these squares, some of the squares will disappear, some will remain blank, and some will have numbers on them.</li>';
+			s += '<li>The first square that you click will never have a mine beneath it.</li>';
+			s += '<li>A number on a square refers to the number of mines that are currently touching that square.</li>';
+			s += '<li>Right mouse button is used to flag squares that contain mines.</li>';
+			s += '<li>Left mouse button is used to click squares that don\'t contain mines.</li>';
+			s += '</ul>';
+			s += '</p>';
+			s += '<h4>View Size</h4>';
+			s += `<input type="number" id="viewH" tooltip="View height" value="${game.viewSize[0]}" min="1" max="99">`;
+			s += `<input type="number" id="viewW" tooltip="View width" value="${game.viewSize[1]}" min="1" max="99">`;
+			s += '<input type="button" name="changeViewSize" tooltip="Change view size" value="Change view size (height/width)" onclick="infimine.changeViewSize();">';
+			s += '<br>';
+			s += '<h4>Space</h4>'; 
+			s += `dimensions: ${game.spaceSize.length}<br>`;
+			s += `view dim 1: ${game.viewDim[0]}&nbsp;<input type="button" name="changechdim1" tooltip="Change Dim 1" value="Change Dim 1" onclick="infimine.changeDim(0);"><br>`;
+			s += `view dim 2: ${game.viewDim[1]}&nbsp;<input type="button" name="changedim2" tooltip="Change Dim 2" value="Change Dim 2" onclick="infimine.changeDim(1);"><br>`;
+			s += 'curr coordinates: ';
+			for (let i in game.currDimCoord) {
+				s += '&nbsp;'+((game.viewDim.indexOf(parseInt(i))>-1)?game.currDimCoord[i]:('<input type="button" id="moveInDim'+i+'" tooltip="Move In Dim '+i+'" value="'+game.currDimCoord[i]+'" onclick="infimine.moveInDim('+i+');">'))+'&nbsp;';
+			}
+			/*
+			s += '<br><hr>';
+			s += '<h3>Properties</h3>'; 
+			for (const [key, value] of Object.entries(game)) {
+				//console.log(`${key}: ${value}`);
+				s += key+':'+((value instanceof Function)?value.name:((value instanceof Array)?'Array length: '+value.length:value))+'<br>'; 
+			}
+			*/
+			s += '</p>'; 
+			s += '</div>';
+			s += '</div>';
+		}
+		return s;
+	}
+	
+	function updateView() {
+		//if (game.inGame===2) return; //finished ...
+		checkEndCondition()
+
+		var el = document.getElementById('infimine');
+		
+		var s = '';
+		for (var b of [buildInfo, buildControls, buildConfig]) {
+			s += b();
+		}
+		
+		el.innerHTML = s;
+	}
+	
+	function checkEndCondition() {
+		if (game.inGame==2) return true;
+		var openBomb = Object.keys(game.field).filter(x => { return (game.field[x]['hasBomb']===true && game.field[x]['isOpen']===true)}).length;
+		game.lives = game.defaultLives - openBomb;
+		game.lives = game.lives>0?game.lives:0;
+		if (game.defaultLives>0 && game.lives<=0) { 
+			game.inGame = 2; 
+			setBestScoreList();
+		} //end
+		
+		var leftOpen = Object.keys(game.field).filter(x => { return (game.field[x]['isOpen']===false && (game.field[x]['hasMark']===false || (game.field[x]['hasMark']===true && game.field[x]['hasBomb']===false)))}).length;
+		if (Object.keys(game.field).length>0 && leftOpen<=0) {
+			game.inGame = 2;
+			setBestScoreList();
+		}
+		return (game.inGame==2);
+	}
+	
+	function clickCell(ev,el) {
+		if (game.inGame===2) return; //finished ...
+		if ((ev.type=='click' && ev.ctrlKey) || (ev.type=='contextmenu') || (game.markOnClick===true)) {
+			changeMarkCell(el.id);
+		} else {
+			openCell(el.id);
+		}
+		
+		game.clickCount += 1;
+
+		updateView();
+
+	}
+	
+	function newGame(gd) {
+		var s = gd.split('_').map(Number);
+		if (s.length==4 && s[3]>0) {
+			var props = {spaceSize: [s[0],s[1]], viewCenter: [-1,-1]};
+			if (s[0]!=0 && s[1]!=0 && s[3]>1) {
+				props['fixedBombs'] = parseInt(s[3]);
+			} else {
+				props['bombDensity'] = s[3];
+			}
+			if (parseInt(s[2])>0) {
+				props['defaultLives'] = s[2];
+			}
+			main(props);
+		}
+	}
+	
+	function myNewGame() {
+		var hi = document.getElementById('ngSpaceHi').checked;
+		var wi = document.getElementById('ngSpaceWi').checked;
+		var h = 0, w = 0; //infinity
+		if (!hi) {
+			h = parseInt(document.getElementById('ngSpaceH').value);
+			h = isNaN(h)?0:h;
+			if (h<=0) { return showMessage('Space Height: must be > 1');} 
+			var hc = document.getElementById('ngSpaceHc').checked;
+			if (hc) h = -h;
+		}
+		if (!wi) {
+			w = parseInt(document.getElementById('ngSpaceW').value);
+			w = isNaN(w)?0:w;
+			if (w<=0) { return showMessage('Space Width: must be > 1'); }
+			var wc = document.getElementById('ngSpaceWc').checked;
+			if (wc) w = -w;
+		}
+		
+			
+		var l = parseInt(document.getElementById('ngLives').value);
+		l = isNaN(w)?0:l;
+		if (l<0 || l>5) { return showMessage('Lives: must be in range 0-5 (0=infinity)'); }
+		var bd = parseFloat(document.getElementById('ngBombDensity').value)/100.0; //%
+		bd = (isNaN(bd)?0:bd).toFixed(4);
+		var b = 0;
+		if (h!=0 && w!=0) {
+			b = parseInt(document.getElementById('ngBombs').value);
+			b = isNaN(b)?0:b;
+			if (b<=0 && bd==0) { return showMessage('Bombs: must be > 0'); }
+		}
+
+		var gd = h+'_'+w+'_'+l+'_'+(b>0?b:bd);
+		newGame(gd);
+	}
+	
+	function onMouseMoveEvent(ev,el) {
+		if (el.classList.contains('moveView') && ev.ctrlKey) {
+			var d = '';
+			if (el.classList.contains("moveUp")) { d = 'U'; }
+			if (el.classList.contains("moveRight")) { d = 'R'; }
+			if (el.classList.contains("moveDown")) { d = 'D'; }
+			if (el.classList.contains("moveLeft")) { d = 'L'; }
+			if (d!=='') {
+				moveViewBy(d);
+			}
+		}
+	}
+	
+	function onContextMenuEvent(ev,el) {
+		ev.preventDefault();
+		if (el.classList.contains("cell")) {
+			clickCell(ev,el);
+		}
+	}
+	
+	function onKeyDownEvent(ev,el) {
+		if (ev.key.substr(0,5)==="Arrow") { 
+			moveViewBy(ev.key.substr(5,1));
+		}
+	}
+	
+	function moveViewBy(dir) {
+		delta = [0,0];
+		if (dir==='U') { 
+			delta = [-1,0];
+		} else if (dir==='R') {
+			delta = [0,1];
+		} else if (dir==='D') {
+			delta = [1,0];
+		} else if (dir==='L') {
+			delta = [0,-1];
+		} else {
+			return; //no change
+		}
+		
+		game.viewCenter = [game.viewCenter[0]+delta[0], game.viewCenter[1]+delta[1]];
+		updateView();
+	}
+	
+	function changeViewSize(newH, newW) {
+		var h = newH===undefined?parseInt(document.getElementById('viewH').value):parseInt(newH);
+		var w = newW===undefined?parseInt(document.getElementById('viewW').value):parseInt(newW);
+		h = isNaN(h)?0:h;
+		w = isNaN(w)?0:w;
+		if (h>0 && h<=99 && w>0 && w<=99) {
+			game.viewSize = [h,w];
+			updateView();
+		} else {
+			showMessage('must be between 1-99')
+		}
+	}
+	
+	function toggleMarker() {
+		game.markOnClick = !game.markOnClick;
+		updateView();
+	}
+	
+	function toggleConfig() {
+		game.showConf = !game.showConf;
+		updateView();
+		
+		document.getElementById("defaultConfTab").click();
+	}
+	
+	function getGameKey() {
+		return JSON.stringify([game.spaceSize, game.defaultLives, game.fixedBombs>0?game.fixedBombs:game.bombDensity]);
+	}
+	
+	function parseGameKey(k) {
+		var p = JSON.parse(k);
+		var s = 'Space Size: ' + ((p[0][0]!=0)?(Math.abs(p[0][0]) + (p[0][0]<0?('(cyklic)'):'')):'infinite') + '/' + ((p[0][1]!=0)?(Math.abs(p[0][1]) + (p[0][1]<0?('(cyklic)'):'')):'infinite');
+		s += ', Lives: ' + (p[1]>0?p[1]:'infinite');
+		if (parseFloat(p[2])>1) {
+			s += ', Bombs: ' + parseInt(p[2]);
+		} else {
+			s += ', Bomb Density: ' + (100*parseFloat(p[2])).toFixed(2) + '%';
+		}
+		var ng = parseInt(p[0][0]) + '_' + parseInt(p[0][1]) + '_' + (parseInt(p[1])>0?p[1]:'') + '_' + ((parseFloat(p[2])>0)?p[2]:'');
+		
+		return [s,ng]
+		
+	}
+	
+	function getBestScoreList(k) {
+		let key = "bestScoreList_"+k;
+		let s = window.localStorage.getItem(key);
+		let scoreList = [];
+		if (s) {
+			scoreList = JSON.parse(s);
+		}
+		return scoreList;
+	}
+	
+	function setBestScoreList() {
+		let k = getGameKey();
+		let scoreList = getBestScoreList(k);
+
+		let newScore = getResult();
+		if (game.inGame===2 && newScore) {
+			scoreList.push([newScore['score'], newScore, new Date()]);
+			scoreList.sort((x,y) => (parseInt(x[0])>parseInt(y[0]) || (parseInt(x[0])==parseInt(y[0]) && x[2]>y[2])));
+			scoreList = scoreList.slice(0,5);  //only 5 best score
+			window.localStorage.setItem("bestScoreList_"+k, JSON.stringify(scoreList));
+		}
+	}
+	
+	function resetBestScoreList() {
+		let k = getGameKey();
+		window.localStorage.removeItem("bestScoreList_"+k);
+	}
+	
+	function bestScoreListGames() {
+		var gmsl = Object.keys(window.localStorage)
+			.filter(x => x.startsWith("bestScoreList_"))
+			.map(function (x) {
+				var k = x.substr(14);
+				var gk = parseGameKey(k);
+				return {
+					key: k,
+					name: gk[0],
+					props: gk[1]
+				}
+		});
+		
+		return gmsl;
+	}
+	
+	function toggleFavoriteGame(gk) {
+		let cfg = favoriteGames();
+		const idx = cfg.indexOf(gk);
+		if (idx>-1) {
+			//remove
+			cfg.splice(idx, 1);
+			window.localStorage.setItem("favoriteGames", JSON.stringify(cfg));
+		} else {
+			//add
+			cfg.push(gk);
+			cfg.sort();
+			window.localStorage.setItem("favoriteGames", JSON.stringify(cfg));
+		}
+		updateView();
+	}
+	
+	function favoriteGames() {
+		let d = window.localStorage.getItem("favoriteGames");
+		let fg = [];
+		if (d) { fg = JSON.parse(d); }
+		return fg;
+	}
+	
+	function quickStartGames() {
+		//default
+		return ['[[8,8],3,10]', '[[16,16],3,40]', '[[16,30],3,99]', '', '[[-8,-8],3,10]', '[[-16,-16],3,40]', '[[-16,-30],3,99]'];
+	}
+	
+	function save() {
+		window.localStorage.setItem("game", JSON.stringify(game));
+	}
+	
+	function load() {
+		let g = window.localStorage.getItem("game");
+		if (g) {
+			game = JSON.parse(g);
+			updateView();
+		}
+	}
+	
+	function saveToDisk() {
+		//var contentType = 'text/plain';
+		var contentType = 'application/json';
+		var filename = 'infimine.save';
+		var content = new Blob([JSON.stringify(game)], {type: contentType});
+		if (window.navigator.msSaveOrOpenBlob) // IE10+
+			window.navigator.msSaveOrOpenBlob(content, filename);
+		else { // Others
+			var a = document.createElement("a"), url = URL.createObjectURL(content);
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			setTimeout(function() {
+				document.body.removeChild(a);
+				window.URL.revokeObjectURL(url);  
+			}, 0); 
+		}
+	}
+	
+	function loadFromDisk() {
+		var files = document.getElementById('loadDiskFile').files;
+		if (files.length <= 0) return false;
+		var fr = new FileReader();
+		fr.onload = function(e) { 
+			if (e.target.result) {
+				try {
+					
+					var d = JSON.parse(e.target.result);
+					mainProps = {};
+					if (d['bombDensity']!==undefined) { mainProps['bombDensity'] = d['bombDensity']; }
+					if (d['canOpenNeighbours']!==undefined) { mainProps['canOpenNeighbours'] = d['canOpenNeighbours']; }
+					if (d['defaultLives']!==undefined) { mainProps['defaultLives'] = d['defaultLives']; }
+					if (d['spaceSize']!==undefined) { mainProps['spaceSize'] = d['spaceSize']; }
+					if (d['fixedBombs']!==undefined) { mainProps['fixedBombs'] = d['fixedBombs']; }
+					if (d['viewSize']!==undefined) { mainProps['viewSize'] = d['viewSize']; }
+					if (d['viewCenter']!==undefined) { mainProps['viewCenter'] = d['viewCenter']; }
+					game  = initDefinition();
+					gv = initValues();
+					game = Object.assign({}, game, gv);
+
+					if (d['field']!==undefined) { game['field'] = d['field']; }
+					if (d['viewDim']!==undefined) { game['viewDim'] = d['viewDim']; }
+					if (d['currDimCoord']!==undefined) { game['currDimCoord'] = d['currDimCoord']; }
+					
+					if (d['inGame']!==undefined) { game['inGame'] = d['inGame']; }
+					if (d['lives']!==undefined) { game['lives'] = d['lives']; }
+					if (d['markOnClick']!==undefined) { game['markOnClick'] = d['markOnClick']; }
+					if (d['clickCount']!==undefined) { game['clickCount'] = d['clickCount']; }
+					if (d['showConf']!==undefined) { game['showConf'] = d['showConf']; }
+					
+					updateView();	
+				
+				} catch(er) {
+					showMessage('Error')
+				}
+			}
+		}
+		fr.readAsText(files.item(0));
+	}
+	
+	function openConfTab(evt, tabName) {
+		var tabcontent = document.getElementsByClassName("conftabcontent");
+		for (let i = 0; i < tabcontent.length; i++) {
+			tabcontent[i].style.display = "none";
+		}
+
+		var tablinks = document.getElementsByClassName("conftablinks");
+		for (let i = 0; i < tablinks.length; i++) {
+			tablinks[i].className = tablinks[i].className.replace(" active", "");
+		}
+
+		document.getElementById(tabName).style.display = "block";
+		evt.currentTarget.className += " active";
+	}
+	
+	function main(props) {
+		if (!props) {
+			let lg = window.localStorage.getItem("lastGame");
+			if (lg && lg.split('_').map(Number).length==4) {
+				newGame(lg);
+				return
+			} else {
+				props = {};
+			}
+		}
+		mainProps = props;
+		game  = initDefinition();
+		restart();
+	}
+	
+	function restart() {
+		gv = initValues();
+		game = Object.assign({}, game, gv);
+		updateView();	
+
+		window.localStorage.setItem("lastGame", parseGameKey(getGameKey())[1]);
+		window.addEventListener("keydown", onKeyDownEvent);
+	}
+	
+	function showMessage(m) {
+		console.log(m);
+	}
+	
+	//test
+	function getField() {
+		return game.field;
+	}
+	
+	return {
+		main: main,
+		restart: restart,
+		save: save,
+		load: load,
+		saveToDisk: saveToDisk,
+		loadFromDisk: loadFromDisk,
+		moveViewBy: moveViewBy,
+		toggleConfig: toggleConfig,
+		toggleMarker: toggleMarker,
+		findCellCenterView: findCellCenterView,
+		changeViewSize: changeViewSize,
+		changeDim: changeDim,
+		moveInDim: moveInDim,
+		clickCell: clickCell,
+		newGame: newGame,
+		myNewGame: myNewGame,
+		resetBestScoreList: resetBestScoreList,
+		toggleFavoriteGame: toggleFavoriteGame,
+		
+		openConfTab: openConfTab,
+		onMouseMoveEvent: onMouseMoveEvent,
+		onContextMenuEvent: onContextMenuEvent
+		
+		//,field: getField
+	}
+})();
+
+infimine.main();
+
+</script>
+</html>
