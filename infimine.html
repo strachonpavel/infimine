@@ -285,7 +285,11 @@ const infimine = (function() {
 	}
 	
 	function findCellCenterView() {
-		var k = Object.keys(game.field).filter(i => { return (game.field[i]['isOpen']===true || game.field[i]['hasMark']===true) });
+		var k = Object.keys(game.field).filter(i => { return (game.field[i]['hasBomb']===false && game.field[i]['hasMark']===true) });
+		if (k.length==0) {
+			k = Object.keys(game.field).filter(i => { return (game.field[i]['isOpen']===true || game.field[i]['hasMark']===true) });
+		}
+
 		if (k.length>0) {
 			var fe = k.sort().shift();
 			centerCell = getKeyFromStrKey(fe);
@@ -726,7 +730,8 @@ const infimine = (function() {
 		game.showConf = !game.showConf;
 		updateView();
 		
-		document.getElementById("defaultConfTab").click();
+		var t = document.getElementById("defaultConfTab");
+		if (t!=null) { t.click(); }
 	}
 	
 	function getGameKey() {
