@@ -285,9 +285,11 @@ const infimine = (function() {
 	}
 	
 	function findCellCenterView() {
-		var k = Object.keys(game.field).filter(i => { return (game.field[i]['hasBomb']===false && game.field[i]['hasMark']===true) });
-		if (k.length==0) {
+		var k = Object.keys(game.field).filter(x => { return (game.field[x]['isOpen']===false && (game.field[x]['hasMark']===false || (game.field[x]['hasMark']===true && game.field[x]['hasBomb']===false)))});
+
+		if (k.length<=0) {
 			k = Object.keys(game.field).filter(i => { return (game.field[i]['isOpen']===true || game.field[i]['hasMark']===true) });
+			console.log("b",k)
 		}
 
 		if (k.length>0) {
