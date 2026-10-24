@@ -238,12 +238,25 @@ function getCell(sk, canBomb=true) {
 	return game.field[sk];
 }
 
+/* field helpers - every predicate over game.field lives here */
+function allCellKeys() { return Object.keys(game.field); }
+function keysWhere(pred) { return allCellKeys().filter(k => pred(game.field[k])); }
+function countWhere(pred) { return keysWhere(pred).length; }
+
+const cellHasBomb = c => c['hasBomb']===true;
+const cellIsOpen = c => c['isOpen']===true;
+const cellIsOpenBomb = c => c['isOpen']===true && c['hasBomb']===true;
+const cellIsMarked = c => c['hasMark']===true;
+const cellIsMarkedBomb = c => c['hasMark']===true && c['hasBomb']===true;
+//closed and still counting for the win condition (unmarked, or marked without a bomb)
+const cellIsOpenable = c => c['isOpen']===false && (c['hasMark']===false || (c['hasMark']===true && c['hasBomb']===false));
+const cellIsSeen = c => c['isOpen']===true || c['hasMark']===true;
+
 function getResult() {
 	if (!game) return null;
-	var b = Object.keys(game.field).filter(i => { return (game.field[i]['hasBomb']===true) }).length;
-	var bo = Object.keys(game.field).filter(i => { return (game.field[i]['isOpen']===true && game.field[i]['hasBomb']===true) }).length;
-	var m = Object.keys(game.field).filter(i => { return (game.field[i]['hasMark']===true) }).length;
-	var mp = Object.keys(game.field).filter(i => { return (game.field[i]['hasMark']===true && game.field[i]['hasBomb']===true) }).length;
+	var bo = countWhere(cellIsOpenBomb);
+	var m = countWhere(cellIsMarked);
+	var mp = countWhere(cellIsMarkedBomb);
 	var ccr = (m>0 && mp>0 && game.clickCount>0)?(game.clickCount/mp):Number.MAX_SAFE_INTEGER; //click count
 	
 	var lr = ((game.defaultLives>0)?(game.defaultLives-game.lives):0) + 1;
@@ -257,9 +270,9 @@ function getBombDensity() {
 	//pure read: derives density from the current state, does not touch it
 	var dens = game.bombDensity;
 	if (game.fixedBombs>0 && game.spaceSize.filter(x => x===null || x===0).length===0) {
-		var s = Math.abs(game.spaceSize.reduce((x,y)=>(x*y)) - Object.keys(game.field).length);
+		var s = Math.abs(game.spaceSize.reduce((x,y)=>(x*y)) - allCellKeys().length);
 		if (s>0) {
-			var b = game.fixedBombs - Object.keys(game.field).filter(x => { return (game.field[x]['hasBomb']===true)}).length;
+			var b = game.fixedBombs - countWhere(cellHasBomb);
 			b = b>game.fixedBombs?game.fixedBombs:(b<0?0:b); //normalize
 			dens = b/s;
 			dens = dens>1?1:(dens<0?0:dens);
@@ -307,10 +320,10 @@ function getCellBombCount(sk) {
 }
 
 function findCellCenterView() {
-	var k = Object.keys(game.field).filter(x => { return (game.field[x]['isOpen']===false && (game.field[x]['hasMark']===false || (game.field[x]['hasMark']===true && game.field[x]['hasBomb']===false)))});
+	var k = keysWhere(cellIsOpenable);
 
 	if (k.length<=0) {
-		k = Object.keys(game.field).filter(i => { return (game.field[i]['isOpen']===true || game.field[i]['hasMark']===true) });
+		k = keysWhere(cellIsSeen);
 	}
 
 	if (k.length>0) {
@@ -446,7 +459,7 @@ function buildInfo() {
 		var r = getResult();
 		s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']})</div>`;
 	} else {
-		s += `<div>${((Object.keys(game.field).length>0)?'Running ...':'Click to start')}</div>`;
+		s += `<div>${((allCellKeys().length>0)?'Running ...':'Click to start')}</div>`;
 	}
 	s += `<div>Lives left: ${((game.defaultLives>0)?((game.lives>=0)?game.lives:''):'&infin;')}</div>`;
 	s += `<div>Clicks: ${game.clickCount}</div>`;
@@ -467,125 +480,145 @@ function templateItemGame(gName, gKey, gProps, gValue, isFav) {
 }
 
 function buildConfig() {
-	var s = ''; 
-	if (game.showConf===true) {
-		/* https://www.w3schools.com/howto/howto_js_tabs.asp */
-		s += '<div id="conf">'; 
-		s += '<div class="conftab">';
-		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfNewGame" id="defaultConfTab">New Game</button>`;
-		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfSaveLoad">Save/Load</button>`;
-		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfBestScore">Best Score</button>`;
-		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfPlayedGames">Played Games</button>`;
-		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfInfo">Info</button>`;
-		s += '</div>';
-		s += '<div id="ConfNewGame" class="conftabcontent">';
-		s += '<h3>New Game</h3>'; 
-		s += '<p>'; 
-		s += '<h4>Favorites</h4>'; 
-		s += '<ul>';
-		let fg = favoriteGames();
-		if (fg) {
-			for (let q of fg) {
-				var g = parseGameKey(q);
-				s += '<li>'+templateItemGame(g[0], g[1], null, q, true)+'</li>';
-			}
-		}
-		s += '</ul>';
-		s += '<h4>Quick Start</h4>'; 
-		s += '<ul>';
-		for (let q of quickStartGames()) {
-			if (q) {
-				var qn = parseGameKey(q);
-				s += '<li>'+templateItemGame(qn[0], qn[1], null, null, null)+'</li>';
-			} else {
-				s += '<hr>';
-			}
-		}
-		s += '</ul>';
-		s += '<br>'; 
-		s += '<h4>My Game</h4>'; 
-		s += `<span>Space Height:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceHi" tooltip="infinite" ${game.spaceSize[0]==0?'checked':''}><br>`; 
-		s += `<input type="number" id="ngSpaceH" tooltip="Space height" value="${Math.abs(game.spaceSize[0])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceHc" tooltip="cyclic" ${game.spaceSize[0]<0?'checked':''}><br>`;
-		s += `<span>Space Width:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceWi" tooltip="infinite" ${game.spaceSize[1]==0?'checked':''}><br>`; 
-		s += `<input type="number" id="ngSpaceW" tooltip="Space width" value="${Math.abs(game.spaceSize[1])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceWc" tooltip="cyclic" ${game.spaceSize[1]<0?'checked':''}><br>`;
-		s += `Lives: <input type="number" id="ngLives" tooltip="Lives" value="${game.defaultLives}" min="0" max="5"><br>`;
-		s += `Bomb density (0-100%): <input type="number" id="ngBombDensity" tooltip="Bomb density" value="${(100*game.bombDensity).toFixed(2)}" min="0" max="99.99" step="0.01"><br>`;
-		s += `Bombs: <input type="number" id="ngBombs" tooltip="Bombs" value="${game.fixedBombs}" min="0"><br>`;
-		s += '<input type="button" name="mynewgame" tooltip="New game" value="New game" data-act="mynewgame">';
-		s += '</p>'; 
-		s += '</div>';
-		s += '<div id="ConfSaveLoad" class="conftabcontent">';
-		s += '<h3>Save/Load</h3>'; 
-		s += '<p>'; 
-		s += '<input type="button" name="save" tooltip="Save the game" value="Save" data-act="save">';
-		s += '<input type="button" name="load" tooltip="Load the game" value="Load" data-act="load">';
-		s += '<br>';
-		s += '<input type="button" name="saveDisk" tooltip="Save the game to disk" value="Save To Disk" data-act="savedisk">';
-		s += '<input type="button" name="loadDisk" tooltip="Load the game from disk" value="Load From Disk" data-act="loaddisk">';
-		s += '<input type="file" id="loadDiskFile" name="loadDiskFile" tooltip="Choose the file from disk" value="infimine.save">';
-		s += '</p>'; 
-		s += '</div>';
-		s += '<div id="ConfBestScore" class="conftabcontent">';
-		s += '<h3>Best Score</h3>'; 
-		s += '<p>'; 
-		s += '<table><tr><td>Score</td><td>Date</td></tr>';
-		for (let i of getBestScoreList(getGameKey())) {
-			s += `<tr><td>${i[0]}</td><td>${(new Date(i[2])).toLocaleString()}</td></tr>`;
-		}
-		s += '</table>';
-		s += '<br><input type="button" name="resetScire" tooltip="Reste Score List" value="Reset Score List" data-act="resetscore">';
-		s += '</p>'; 
-		s += '</div>';
-		s += '<div id="ConfPlayedGames" class="conftabcontent">';
-		s += '<h3>Played Games</h3>'; 
-		s += '<p>'; 
-		s += '<ul>'; 
-		for (let g of bestScoreListGames()) {
-			s += '<li>'+templateItemGame(g['name'], g['key'], g['props'], g['key'], (fg!=null && fg!==undefined && fg.indexOf(g['key'])>-1))+'</li>';
-		}
-		s += '</ul>'; 
-		s += '</p>'; 
-		s += '</div>';
-		s += '<div id="ConfInfo" class="conftabcontent">';
-		s += '<h3>Info</h3>'; 
-		s += '<p>'; 
-		s += '<h4>Instructions</h4>';
-		s += '<p>';
-		s += '<ul>';
-		s += '<li>Each game starts out with a grid of unmarked squares. After clicking one of these squares, some of the squares will disappear, some will remain blank, and some will have numbers on them.</li>';
-		s += '<li>The first square that you click will never have a mine beneath it.</li>';
-		s += '<li>A number on a square refers to the number of mines that are currently touching that square.</li>';
-		s += '<li>Right mouse button is used to flag squares that contain mines.</li>';
-		s += '<li>Left mouse button is used to click squares that don\'t contain mines.</li>';
-		s += '</ul>';
-		s += '</p>';
-		s += '<h4>View Size</h4>';
-		s += `<input type="number" id="viewH" tooltip="View height" value="${game.viewSize[0]}" min="1" max="99">`;
-		s += `<input type="number" id="viewW" tooltip="View width" value="${game.viewSize[1]}" min="1" max="99">`;
-		s += '<input type="button" name="changeViewSize" tooltip="Change view size" value="Change view size (height/width)" data-act="viewsize">';
-		s += '<br>';
-		s += '<h4>Space</h4>'; 
-		s += `dimensions: ${game.spaceSize.length}<br>`;
-		s += `view dim 1: ${game.viewDim[0]}&nbsp;<input type="button" tooltip="Change Dim 1" value="Change Dim 1" data-act="changedim" data-dim="0"><br>`;
-		s += `view dim 2: ${game.viewDim[1]}&nbsp;<input type="button" tooltip="Change Dim 2" value="Change Dim 2" data-act="changedim" data-dim="1"><br>`;
-		s += 'curr coordinates: ';
-		for (let i in game.currDimCoord) {
-			s += '&nbsp;'+((game.viewDim.indexOf(parseInt(i))>-1)?game.currDimCoord[i]:('<input type="button" tooltip="Move In Dim '+i+'" value="'+game.currDimCoord[i]+'" data-act="moveindim" data-dim="'+i+'">'))+'&nbsp;';
-		}
-		/*
-		s += '<br><hr>';
-		s += '<h3>Properties</h3>'; 
-		for (const [key, value] of Object.entries(game)) {
-			//console.log(`${key}: ${value}`);
-			s += key+':'+((value instanceof Function)?value.name:((value instanceof Array)?'Array length: '+value.length:value))+'<br>'; 
-		}
-		*/
-		s += '</p>'; 
-		s += '</div>';
-		s += '</div>';
-	}
+	if (game.showConf!==true) return '';
+	/* https://www.w3schools.com/howto/howto_js_tabs.asp */
+	return '<div id="conf">'
+		+ '<div class="conftab">' + buildConfTabs() + '</div>'
+		+ buildConfNewGame()
+		+ buildConfSaveLoad()
+		+ buildConfBestScore()
+		+ buildConfPlayedGames()
+		+ buildConfInfo()
+		+ '</div>';
+}
+
+function buildConfTabs() {
+	var s = '';
+	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfNewGame" id="defaultConfTab">New Game</button>`;
+	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfSaveLoad">Save/Load</button>`;
+	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfBestScore">Best Score</button>`;
+	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfPlayedGames">Played Games</button>`;
+	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfInfo">Info</button>`;
 	return s;
 }
+
+function buildConfNewGame() {
+	var s = '<div id="ConfNewGame" class="conftabcontent">';
+	s += '<h3>New Game</h3>'; 
+	s += '<p>'; 
+	s += '<h4>Favorites</h4>'; 
+	s += '<ul>';
+	let fg = favoriteGames();
+	if (fg) {
+		for (let q of fg) {
+			var g = parseGameKey(q);
+			s += '<li>'+templateItemGame(g[0], g[1], null, q, true)+'</li>';
+		}
+	}
+	s += '</ul>';
+	s += '<h4>Quick Start</h4>'; 
+	s += '<ul>';
+	for (let q of quickStartGames()) {
+		if (q) {
+			var qn = parseGameKey(q);
+			s += '<li>'+templateItemGame(qn[0], qn[1], null, null, null)+'</li>';
+		} else {
+			s += '<hr>';
+		}
+	}
+	s += '</ul>';
+	s += '<br>'; 
+	s += '<h4>My Game</h4>'; 
+	s += `<span>Space Height:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceHi" tooltip="infinite" ${game.spaceSize[0]==0?'checked':''}><br>`; 
+	s += `<input type="number" id="ngSpaceH" tooltip="Space height" value="${Math.abs(game.spaceSize[0])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceHc" tooltip="cyclic" ${game.spaceSize[0]<0?'checked':''}><br>`;
+	s += `<span>Space Width:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceWi" tooltip="infinite" ${game.spaceSize[1]==0?'checked':''}><br>`; 
+	s += `<input type="number" id="ngSpaceW" tooltip="Space width" value="${Math.abs(game.spaceSize[1])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceWc" tooltip="cyclic" ${game.spaceSize[1]<0?'checked':''}><br>`;
+	s += `Lives: <input type="number" id="ngLives" tooltip="Lives" value="${game.defaultLives}" min="0" max="5"><br>`;
+	s += `Bomb density (0-100%): <input type="number" id="ngBombDensity" tooltip="Bomb density" value="${(100*game.bombDensity).toFixed(2)}" min="0" max="99.99" step="0.01"><br>`;
+	s += `Bombs: <input type="number" id="ngBombs" tooltip="Bombs" value="${game.fixedBombs}" min="0"><br>`;
+	s += '<input type="button" name="mynewgame" tooltip="New game" value="New game" data-act="mynewgame">';
+	s += '</p>'; 
+	s += '</div>';
+	return s;
+}
+
+function buildConfSaveLoad() {
+	var s = '<div id="ConfSaveLoad" class="conftabcontent">';
+	s += '<h3>Save/Load</h3>'; 
+	s += '<p>'; 
+	s += '<input type="button" name="save" tooltip="Save the game" value="Save" data-act="save">';
+	s += '<input type="button" name="load" tooltip="Load the game" value="Load" data-act="load">';
+	s += '<br>';
+	s += '<input type="button" name="saveDisk" tooltip="Save the game to disk" value="Save To Disk" data-act="savedisk">';
+	s += '<input type="button" name="loadDisk" tooltip="Load the game from disk" value="Load From Disk" data-act="loaddisk">';
+	s += '<input type="file" id="loadDiskFile" name="loadDiskFile" tooltip="Choose the file from disk" value="infimine.save">';
+	s += '</p>'; 
+	s += '</div>';
+	return s;
+}
+
+function buildConfBestScore() {
+	var s = '<div id="ConfBestScore" class="conftabcontent">';
+	s += '<h3>Best Score</h3>'; 
+	s += '<p>'; 
+	s += '<table><tr><td>Score</td><td>Date</td></tr>';
+	for (let i of getBestScoreList(getGameKey())) {
+		s += `<tr><td>${i[0]}</td><td>${(new Date(i[2])).toLocaleString()}</td></tr>`;
+	}
+	s += '</table>';
+	s += '<br><input type="button" name="resetScire" tooltip="Reste Score List" value="Reset Score List" data-act="resetscore">';
+	s += '</p>'; 
+	s += '</div>';
+	return s;
+}
+
+function buildConfPlayedGames() {
+	var s = '<div id="ConfPlayedGames" class="conftabcontent">';
+	s += '<h3>Played Games</h3>'; 
+	s += '<p>'; 
+	s += '<ul>'; 
+	let fg = favoriteGames(); //favorites, so played games can be flagged as such
+	for (let g of bestScoreListGames()) {
+		s += '<li>'+templateItemGame(g['name'], g['key'], g['props'], g['key'], (fg!=null && fg!==undefined && fg.indexOf(g['key'])>-1))+'</li>';
+	}
+	s += '</ul>'; 
+	s += '</p>'; 
+	s += '</div>';
+	return s;
+}
+
+function buildConfInfo() {
+	var s = '<div id="ConfInfo" class="conftabcontent">';
+	s += '<h3>Info</h3>'; 
+	s += '<p>'; 
+	s += '<h4>Instructions</h4>';
+	s += '<p>';
+	s += '<ul>';
+	s += '<li>Each game starts out with a grid of unmarked squares. After clicking one of these squares, some of the squares will disappear, some will remain blank, and some will have numbers on them.</li>';
+	s += '<li>The first square that you click will never have a mine beneath it.</li>';
+	s += '<li>A number on a square refers to the number of mines that are currently touching that square.</li>';
+	s += '<li>Right mouse button is used to flag squares that contain mines.</li>';
+	s += '<li>Left mouse button is used to click squares that don\'t contain mines.</li>';
+	s += '</ul>';
+	s += '</p>';
+	s += '<h4>View Size</h4>';
+	s += `<input type="number" id="viewH" tooltip="View height" value="${game.viewSize[0]}" min="1" max="99">`;
+	s += `<input type="number" id="viewW" tooltip="View width" value="${game.viewSize[1]}" min="1" max="99">`;
+	s += '<input type="button" name="changeViewSize" tooltip="Change view size" value="Change view size (height/width)" data-act="viewsize">';
+	s += '<br>';
+	s += '<h4>Space</h4>'; 
+	s += `dimensions: ${game.spaceSize.length}<br>`;
+	s += `view dim 1: ${game.viewDim[0]}&nbsp;<input type="button" tooltip="Change Dim 1" value="Change Dim 1" data-act="changedim" data-dim="0"><br>`;
+	s += `view dim 2: ${game.viewDim[1]}&nbsp;<input type="button" tooltip="Change Dim 2" value="Change Dim 2" data-act="changedim" data-dim="1"><br>`;
+	s += 'curr coordinates: ';
+	for (let i in game.currDimCoord) {
+		s += '&nbsp;'+((game.viewDim.indexOf(parseInt(i))>-1)?game.currDimCoord[i]:('<input type="button" tooltip="Move In Dim '+i+'" value="'+game.currDimCoord[i]+'" data-act="moveindim" data-dim="'+i+'">'))+'&nbsp;';
+	}
+	s += '</p>'; 
+	s += '</div>';
+	return s;
+}
+
 
 function updateView() {
 	//pure render: reads the model, never modifies it (end condition is checked by the action handlers)
@@ -601,7 +634,7 @@ function updateView() {
 
 function checkEndCondition() {
 	if (game.inGame==2) return true;
-	var openBomb = Object.keys(game.field).filter(x => { return (game.field[x]['hasBomb']===true && game.field[x]['isOpen']===true)}).length;
+	var openBomb = countWhere(cellIsOpenBomb);
 	game.lives = game.defaultLives - openBomb;
 	game.lives = game.lives>0?game.lives:0;
 	if (game.defaultLives>0 && game.lives<=0) { 
@@ -609,8 +642,8 @@ function checkEndCondition() {
 		setBestScoreList();
 	} //end
 	
-	var leftOpen = Object.keys(game.field).filter(x => { return (game.field[x]['isOpen']===false && (game.field[x]['hasMark']===false || (game.field[x]['hasMark']===true && game.field[x]['hasBomb']===false)))}).length;
-	if (Object.keys(game.field).length>0 && leftOpen<=0) {
+	var leftOpen = countWhere(cellIsOpenable);
+	if (allCellKeys().length>0 && leftOpen<=0) {
 		game.inGame = 2;
 		setBestScoreList();
 	}
@@ -920,26 +953,16 @@ function loadFromDisk() {
 				
 				var d = JSON.parse(e.target.result);
 				mainProps = {};
-				if (d['bombDensity']!==undefined) { mainProps['bombDensity'] = d['bombDensity']; }
-				if (d['canOpenNeighbours']!==undefined) { mainProps['canOpenNeighbours'] = d['canOpenNeighbours']; }
-				if (d['defaultLives']!==undefined) { mainProps['defaultLives'] = d['defaultLives']; }
-				if (d['spaceSize']!==undefined) { mainProps['spaceSize'] = d['spaceSize']; }
-				if (d['fixedBombs']!==undefined) { mainProps['fixedBombs'] = d['fixedBombs']; }
-				if (d['viewSize']!==undefined) { mainProps['viewSize'] = d['viewSize']; }
-				if (d['viewCenter']!==undefined) { mainProps['viewCenter'] = d['viewCenter']; }
+				for (let k of ['bombDensity', 'canOpenNeighbours', 'defaultLives', 'spaceSize', 'fixedBombs', 'viewSize', 'viewCenter']) {
+					if (d[k]!==undefined) { mainProps[k] = d[k]; }
+				}
 				game  = initDefinition();
 				var gv = initValues();
 				game = Object.assign({}, game, gv);
 
-				if (d['field']!==undefined) { game['field'] = d['field']; }
-				if (d['viewDim']!==undefined) { game['viewDim'] = d['viewDim']; }
-				if (d['currDimCoord']!==undefined) { game['currDimCoord'] = d['currDimCoord']; }
-				
-				if (d['inGame']!==undefined) { game['inGame'] = d['inGame']; }
-				if (d['lives']!==undefined) { game['lives'] = d['lives']; }
-				if (d['markOnClick']!==undefined) { game['markOnClick'] = d['markOnClick']; }
-				if (d['clickCount']!==undefined) { game['clickCount'] = d['clickCount']; }
-				if (d['showConf']!==undefined) { game['showConf'] = d['showConf']; }
+				for (let k of ['field', 'viewDim', 'currDimCoord', 'inGame', 'lives', 'markOnClick', 'clickCount', 'showConf']) {
+					if (d[k]!==undefined) { game[k] = d[k]; }
+				}
 				
 				checkEndCondition(); //a loaded game may already be over
 				updateView();	
