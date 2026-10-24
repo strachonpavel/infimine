@@ -146,6 +146,12 @@ var game = {};
 var mainProps = {};
 var rng = Math.random; //random source used for bombs - injectable for deterministic tests/seeds
 
+/* storage keys - single source of truth; the exact strings must stay unchanged for compatibility */
+const STORAGE_KEY_GAME = 'game';
+const STORAGE_KEY_LAST_GAME = 'lastGame';
+const STORAGE_KEY_FAVORITES = 'favoriteGames';
+const STORAGE_KEY_BEST_SCORE_PREFIX = 'bestScoreList_';
+
 function setRandom(f) {
 	rng = (typeof f === 'function') ? f : Math.random;
 }
@@ -814,12 +820,45 @@ function toggleConfig() {
 	if (t!=null) { t.click(); }
 }
 
+/* storage layer - all localStorage access goes through these helpers
+   (keys are constants, JSON parsing never throws, values are validated) */
+function storageGet(key) {
+	try { return window.localStorage.getItem(key); } catch(e) { return null; }
+}
+
+function storageSet(key, value) {
+	try { window.localStorage.setItem(key, value); } catch(e) { /* quota / private mode */ }
+}
+
+function storageRemove(key) {
+	try { window.localStorage.removeItem(key); } catch(e) { /* ignore */ }
+}
+
+function storageKeys() {
+	try { return Object.keys(window.localStorage); } catch(e) { return []; }
+}
+
+function parseJSONSafe(s, fallback) {
+	if (!s) return fallback;
+	try {
+		var v = JSON.parse(s);
+		return (v===undefined || v===null) ? fallback : v;
+	} catch(e) { return fallback; }
+}
+
+function isValidGame(d) {
+	return (d!==null && typeof d==='object' && !Array.isArray(d)
+		&& d['field']!==null && typeof d['field']==='object' && !Array.isArray(d['field'])
+		&& Array.isArray(d['spaceSize']));
+}
+
 function getGameKey() {
 	return JSON.stringify([game.spaceSize, game.defaultLives, game.fixedBombs>0?game.fixedBombs:game.bombDensity]);
 }
 
 function parseGameKey(k) {
-	var p = JSON.parse(k);
+	var p = parseJSONSafe(k, null);
+	if (!Array.isArray(p) || !Array.isArray(p[0])) return ['Unknown game', ''];
 	var s = 'Space Size: ' + ((p[0][0]!=0)?(Math.abs(p[0][0]) + (p[0][0]<0?('(cyklic)'):'')):'infinite') + '/' + ((p[0][1]!=0)?(Math.abs(p[0][1]) + (p[0][1]<0?('(cyklic)'):'')):'infinite');
 	s += ', Lives: ' + (p[1]>0?p[1]:'infinite');
 	if (parseFloat(p[2])>1) {
@@ -834,13 +873,9 @@ function parseGameKey(k) {
 }
 
 function getBestScoreList(k) {
-	let key = "bestScoreList_"+k;
-	let s = window.localStorage.getItem(key);
-	let scoreList = [];
-	if (s) {
-		scoreList = JSON.parse(s);
-	}
-	return scoreList;
+	let s = storageGet(STORAGE_KEY_BEST_SCORE_PREFIX + k);
+	let scoreList = parseJSONSafe(s, []);
+	return Array.isArray(scoreList) ? scoreList : [];
 }
 
 function setBestScoreList() {
@@ -857,20 +892,20 @@ function setBestScoreList() {
 			return (new Date(x[2])) - (new Date(y[2])); //older date first
 		});
 		scoreList = scoreList.slice(0,5);  //only 5 best score
-		window.localStorage.setItem("bestScoreList_"+k, JSON.stringify(scoreList));
+		storageSet(STORAGE_KEY_BEST_SCORE_PREFIX + k, JSON.stringify(scoreList));
 	}
 }
 
 function resetBestScoreList() {
 	let k = getGameKey();
-	window.localStorage.removeItem("bestScoreList_"+k);
+	storageRemove(STORAGE_KEY_BEST_SCORE_PREFIX + k);
 }
 
 function bestScoreListGames() {
-	var gmsl = Object.keys(window.localStorage)
-		.filter(x => x.startsWith("bestScoreList_"))
+	var gmsl = storageKeys()
+		.filter(x => x.startsWith(STORAGE_KEY_BEST_SCORE_PREFIX))
 		.map(function (x) {
-			var k = x.substr(14);
+			var k = x.substring(STORAGE_KEY_BEST_SCORE_PREFIX.length);
 			var gk = parseGameKey(k);
 			return {
 				key: k,
@@ -888,21 +923,18 @@ function toggleFavoriteGame(gk) {
 	if (idx>-1) {
 		//remove
 		cfg.splice(idx, 1);
-		window.localStorage.setItem("favoriteGames", JSON.stringify(cfg));
 	} else {
 		//add
 		cfg.push(gk);
 		cfg.sort();
-		window.localStorage.setItem("favoriteGames", JSON.stringify(cfg));
 	}
+	storageSet(STORAGE_KEY_FAVORITES, JSON.stringify(cfg));
 	updateView();
 }
 
 function favoriteGames() {
-	let d = window.localStorage.getItem("favoriteGames");
-	let fg = [];
-	if (d) { fg = JSON.parse(d); }
-	return fg;
+	let fg = parseJSONSafe(storageGet(STORAGE_KEY_FAVORITES), []);
+	return Array.isArray(fg) ? fg : [];
 }
 
 function quickStartGames() {
@@ -911,16 +943,19 @@ function quickStartGames() {
 }
 
 function save() {
-	window.localStorage.setItem("game", JSON.stringify(game));
+	storageSet(STORAGE_KEY_GAME, JSON.stringify(game));
 }
 
 function load() {
-	let g = window.localStorage.getItem("game");
-	if (g) {
-		game = JSON.parse(g);
-		checkEndCondition(); //a loaded game may already be over
-		updateView();
+	let g = storageGet(STORAGE_KEY_GAME);
+	let d = parseJSONSafe(g, null);
+	if (!isValidGame(d)) {
+		if (g) showMessage('Saved game is corrupted - not loaded');
+		return;
 	}
+	game = d;
+	checkEndCondition(); //a loaded game may already be over
+	updateView();
 }
 
 function saveToDisk() {
@@ -951,7 +986,8 @@ function loadFromDisk() {
 		if (e.target.result) {
 			try {
 				
-				var d = JSON.parse(e.target.result);
+				var d = parseJSONSafe(e.target.result, null);
+				if (!isValidGame(d)) { throw new Error('invalid game'); }
 				mainProps = {};
 				for (let k of ['bombDensity', 'canOpenNeighbours', 'defaultLives', 'spaceSize', 'fixedBombs', 'viewSize', 'viewCenter']) {
 					if (d[k]!==undefined) { mainProps[k] = d[k]; }
@@ -992,7 +1028,7 @@ function openConfTab(tabName, btn) {
 
 function main(props) {
 	if (!props) {
-		let lg = window.localStorage.getItem("lastGame");
+		let lg = storageGet(STORAGE_KEY_LAST_GAME);
 		if (lg && lg.split('_').map(Number).length==4) {
 			newGame(lg);
 			return
@@ -1010,7 +1046,7 @@ function restart() {
 	game = Object.assign({}, game, gv);
 	updateView();	
 
-	window.localStorage.setItem("lastGame", parseGameKey(getGameKey())[1]);
+	storageSet(STORAGE_KEY_LAST_GAME, parseGameKey(getGameKey())[1]);
 }
 
 function showMessage(m) {
