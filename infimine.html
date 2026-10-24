@@ -381,18 +381,16 @@ function moveInDim(d) {
 
 
 function buildView() {
-	var evtTemp = (game.inGame===2)?'':'onclick="infimine.clickCell(event,this)" oncontextmenu="infimine.onContextMenuEvent(event,this)"';
-	var s = '<table class="minefield '+((game.inGame===2)?'noplay':'')+'" oncontextmenu="infimine.onContextMenuEvent(event,this)">';
+	var s = '<table class="minefield '+((game.inGame===2)?'noplay':'')+'">';
 	for (var r of [...Array(game.viewSize[0]).keys()].map(x => x + game.viewCenter[0])) {
 		s += '<tr>';
 		for (var c of [...Array(game.viewSize[1]).keys()].map(x => x + game.viewCenter[1])) {
 			var sk = getStrKeyFromKey([r,c]);
 			var vd = '';
 			var cls = 'shadow';
-			var evt = evtTemp;
+			var act = (sk===null || game.inGame===2)?'':' data-act="cell" data-key="'+sk+'"';
 			if (sk===null) {
 				cls = 'noplay';
-				evt = '';
 			} else if (sk in game.field) {
 				//if (field[sk]['isOpen']==true) vd = '.'; //vd += '.'
 				if (game.field[sk]['bombCount']!==undefined) {
@@ -402,7 +400,7 @@ function buildView() {
 				if (game.field[sk]['hasMark']==true && game.field[sk]['isOpen']==false) { vd = '&#9873;'; cls = 'mark'; };  //M  &#127987   &#128681 &#9873;
 				if (game.field[sk]['hasBomb']==true && game.field[sk]['isOpen']==true) { vd = '&#128165;'; cls = 'bomb'; }; //*  &#128163; &#128165;
 			}
-			s += '<td id="'+sk+'" class="cell '+cls+'" '+evt+'>&nbsp;'+vd+'&nbsp;</td>';
+			s += '<td class="cell '+cls+'"'+act+'>&nbsp;'+vd+'&nbsp;</td>';
 		}	
 		s += '</tr>';
 	}
@@ -413,19 +411,19 @@ function buildView() {
 function buildControls() {
 	var s = '<table class="move">' + 
 			'<tr>' +
-				'<td class="find" tooltip="Find/Center" onclick="infimine.findCellCenterView();">&#128270;</td>' +  //  &#10687;  &#128270;
-				'<td class="moveView moveUp" tooltip="Move up" onclick="infimine.moveViewBy(\'U\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e7;</td>' +  //U
-				'<td class="restart" tooltip="Restart" onclick="infimine.restart();">&#x21bb;</td>' +
+				'<td class="find" tooltip="Find/Center" data-act="find">&#128270;</td>' +  //  &#10687;  &#128270;
+				'<td class="moveView moveUp" tooltip="Move up" data-act="move" data-dir="U">&#x21e7;</td>' +  //U
+				'<td class="restart" tooltip="Restart" data-act="restart">&#x21bb;</td>' +
 			'</tr>' +
 			'<tr>' +
-				'<td class="moveView moveLeft" tooltip="Move left" onclick="infimine.moveViewBy(\'L\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e6;</td>' +  //L
+				'<td class="moveView moveLeft" tooltip="Move left" data-act="move" data-dir="L">&#x21e6;</td>' +  //L
 				'<td>'+buildView()+'</td>' +
-				'<td class="moveView moveRight" tooltip="Move right" onclick="infimine.moveViewBy(\'R\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e8;</td>' +  //R
+				'<td class="moveView moveRight" tooltip="Move right" data-act="move" data-dir="R">&#x21e8;</td>' +  //R
 			'</tr>' +
 			'<tr>' +
-				'<td class="marker marker-'+(game.markOnClick===true?'on':'off')+'" tooltip="Toggle open/mark" onclick="infimine.toggleMarker();">&#9873;</td>' +
-				'<td class="moveView moveDown" tooltip="Move down" onclick="infimine.moveViewBy(\'D\');" onmousemove="infimine.onMouseMoveEvent(event,this);">&#x21e9;</td>' +  //D
-				'<td class="conf" tooltip="Configuration" onclick="infimine.toggleConfig();">&#9776;</td>' +
+				'<td class="marker marker-'+(game.markOnClick===true?'on':'off')+'" tooltip="Toggle open/mark" data-act="marker">&#9873;</td>' +
+				'<td class="moveView moveDown" tooltip="Move down" data-act="move" data-dir="D">&#x21e9;</td>' +  //D
+				'<td class="conf" tooltip="Configuration" data-act="conf">&#9776;</td>' +
 			'</tr>' +
 		'</table>'; 
 
@@ -452,11 +450,11 @@ function buildInfo() {
 function templateItemGame(gName, gKey, gProps, gValue, isFav) {
 	let s = gName; 
 	if (gKey!==null && gKey!==undefined) {
-		s += ` <input type="button" name="newgame${gKey}" tooltip="New game" value="New game" onclick="infimine.newGame('${(gProps!==null && gProps!==undefined)?gProps:gKey}');">`; 
+		s += ` <input type="button" name="newgame${gKey}" tooltip="New game" value="New game" data-act="newgame" data-key="${(gProps!==null && gProps!==undefined)?gProps:gKey}">`; 
 	}
 	if (isFav!==null && isFav!==undefined) {
 		let ft = isFav?"Remove from Favorites":"Add to Favorites";
-		s += ` <input type="button" name="favtoggle${gKey}" tooltip="${ft}" value="${ft}" onclick="infimine.toggleFavoriteGame('${gValue}')">`; 
+		s += ` <input type="button" name="favtoggle${gKey}" tooltip="${ft}" value="${ft}" data-act="fav" data-key="${gValue}">`; 
 	}
 	
 	return s;
@@ -468,11 +466,11 @@ function buildConfig() {
 		/* https://www.w3schools.com/howto/howto_js_tabs.asp */
 		s += '<div id="conf">'; 
 		s += '<div class="conftab">';
-		s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfNewGame');" id="defaultConfTab">New Game</button>`;
-		s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfSaveLoad');">Save/Load</button>`;
-		s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfBestScore');">Best Score</button>`;
-		s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfPlayedGames');">Played Games</button>`;
-		s += `<button class="conftablinks" onclick="infimine.openConfTab(event, 'ConfInfo');">Info</button>`;
+		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfNewGame" id="defaultConfTab">New Game</button>`;
+		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfSaveLoad">Save/Load</button>`;
+		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfBestScore">Best Score</button>`;
+		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfPlayedGames">Played Games</button>`;
+		s += `<button class="conftablinks" data-act="conftab" data-tab="ConfInfo">Info</button>`;
 		s += '</div>';
 		s += '<div id="ConfNewGame" class="conftabcontent">';
 		s += '<h3>New Game</h3>'; 
@@ -507,17 +505,17 @@ function buildConfig() {
 		s += `Lives: <input type="number" id="ngLives" tooltip="Lives" value="${game.defaultLives}" min="0" max="5"><br>`;
 		s += `Bomb density (0-100%): <input type="number" id="ngBombDensity" tooltip="Bomb density" value="${(100*game.bombDensity).toFixed(2)}" min="0" max="99.99" step="0.01"><br>`;
 		s += `Bombs: <input type="number" id="ngBombs" tooltip="Bombs" value="${game.fixedBombs}" min="0"><br>`;
-		s += '<input type="button" name="mynewgame" tooltip="New game" value="New game" onclick="infimine.myNewGame();">';
+		s += '<input type="button" name="mynewgame" tooltip="New game" value="New game" data-act="mynewgame">';
 		s += '</p>'; 
 		s += '</div>';
 		s += '<div id="ConfSaveLoad" class="conftabcontent">';
 		s += '<h3>Save/Load</h3>'; 
 		s += '<p>'; 
-		s += '<input type="button" name="save" tooltip="Save the game" value="Save" onclick="infimine.save();">';
-		s += '<input type="button" name="load" tooltip="Load the game" value="Load" onclick="infimine.load();">';
+		s += '<input type="button" name="save" tooltip="Save the game" value="Save" data-act="save">';
+		s += '<input type="button" name="load" tooltip="Load the game" value="Load" data-act="load">';
 		s += '<br>';
-		s += '<input type="button" name="saveDisk" tooltip="Save the game to disk" value="Save To Disk" onclick="infimine.saveToDisk();">';
-		s += '<input type="button" name="loadDisk" tooltip="Load the game from disk" value="Load From Disk" onclick="infimine.loadFromDisk();">';
+		s += '<input type="button" name="saveDisk" tooltip="Save the game to disk" value="Save To Disk" data-act="savedisk">';
+		s += '<input type="button" name="loadDisk" tooltip="Load the game from disk" value="Load From Disk" data-act="loaddisk">';
 		s += '<input type="file" id="loadDiskFile" name="loadDiskFile" tooltip="Choose the file from disk" value="infimine.save">';
 		s += '</p>'; 
 		s += '</div>';
@@ -529,7 +527,7 @@ function buildConfig() {
 			s += `<tr><td>${i[0]}</td><td>${(new Date(i[2])).toLocaleString()}</td></tr>`;
 		}
 		s += '</table>';
-		s += '<br><input type="button" name="resetScire" tooltip="Reste Score List" value="Reset Score List" onclick="infimine.resetBestScoreList();">';
+		s += '<br><input type="button" name="resetScire" tooltip="Reste Score List" value="Reset Score List" data-act="resetscore">';
 		s += '</p>'; 
 		s += '</div>';
 		s += '<div id="ConfPlayedGames" class="conftabcontent">';
@@ -558,15 +556,15 @@ function buildConfig() {
 		s += '<h4>View Size</h4>';
 		s += `<input type="number" id="viewH" tooltip="View height" value="${game.viewSize[0]}" min="1" max="99">`;
 		s += `<input type="number" id="viewW" tooltip="View width" value="${game.viewSize[1]}" min="1" max="99">`;
-		s += '<input type="button" name="changeViewSize" tooltip="Change view size" value="Change view size (height/width)" onclick="infimine.changeViewSize();">';
+		s += '<input type="button" name="changeViewSize" tooltip="Change view size" value="Change view size (height/width)" data-act="viewsize">';
 		s += '<br>';
 		s += '<h4>Space</h4>'; 
 		s += `dimensions: ${game.spaceSize.length}<br>`;
-		s += `view dim 1: ${game.viewDim[0]}&nbsp;<input type="button" name="changechdim1" tooltip="Change Dim 1" value="Change Dim 1" onclick="infimine.changeDim(0);"><br>`;
-		s += `view dim 2: ${game.viewDim[1]}&nbsp;<input type="button" name="changedim2" tooltip="Change Dim 2" value="Change Dim 2" onclick="infimine.changeDim(1);"><br>`;
+		s += `view dim 1: ${game.viewDim[0]}&nbsp;<input type="button" tooltip="Change Dim 1" value="Change Dim 1" data-act="changedim" data-dim="0"><br>`;
+		s += `view dim 2: ${game.viewDim[1]}&nbsp;<input type="button" tooltip="Change Dim 2" value="Change Dim 2" data-act="changedim" data-dim="1"><br>`;
 		s += 'curr coordinates: ';
 		for (let i in game.currDimCoord) {
-			s += '&nbsp;'+((game.viewDim.indexOf(parseInt(i))>-1)?game.currDimCoord[i]:('<input type="button" id="moveInDim'+i+'" tooltip="Move In Dim '+i+'" value="'+game.currDimCoord[i]+'" onclick="infimine.moveInDim('+i+');">'))+'&nbsp;';
+			s += '&nbsp;'+((game.viewDim.indexOf(parseInt(i))>-1)?game.currDimCoord[i]:('<input type="button" tooltip="Move In Dim '+i+'" value="'+game.currDimCoord[i]+'" data-act="moveindim" data-dim="'+i+'">'))+'&nbsp;';
 		}
 		/*
 		s += '<br><hr>';
@@ -618,9 +616,9 @@ function checkEndCondition() {
 function clickCell(ev,el) {
 	if (game.inGame===2) return; //finished ...
 	if ((ev.type=='click' && ev.ctrlKey) || (ev.type=='contextmenu') || (game.markOnClick===true)) {
-		changeMarkCell(el.id);
+		changeMarkCell(el.dataset.key);
 	} else {
-		openCell(el.id);
+		openCell(el.dataset.key);
 	}
 	
 	game.clickCount += 1;
@@ -681,27 +679,54 @@ function myNewGame() {
 	newGame(gd);
 }
 
-function onMouseMoveEvent(ev,el) {
-	if (el.classList.contains('moveView') && ev.ctrlKey) {
-		var d = '';
-		if (el.classList.contains("moveUp")) { d = 'U'; }
-		if (el.classList.contains("moveRight")) { d = 'R'; }
-		if (el.classList.contains("moveDown")) { d = 'D'; }
-		if (el.classList.contains("moveLeft")) { d = 'L'; }
-		if (d!=='') {
-			moveViewBy(d);
-		}
+/* --- event delegation: one listener per event type on the root element --- */
+function onRootClick(ev) {
+	var el = ev.target.closest('[data-act]');
+	if (el===null) return;
+	switch (el.dataset.act) {
+		case 'cell': clickCell(ev, el); break;
+		case 'find': findCellCenterView(); break;
+		case 'move': moveViewBy(el.dataset.dir); break;
+		case 'restart': restart(); break;
+		case 'marker': toggleMarker(); break;
+		case 'conf': toggleConfig(); break;
+		case 'newgame': newGame(el.dataset.key); break;
+		case 'fav': toggleFavoriteGame(el.dataset.key); break;
+		case 'conftab': openConfTab(el.dataset.tab, el); break;
+		case 'mynewgame': myNewGame(); break;
+		case 'save': save(); break;
+		case 'load': load(); break;
+		case 'savedisk': saveToDisk(); break;
+		case 'loaddisk': loadFromDisk(); break;
+		case 'resetscore': resetBestScoreList(); break;
+		case 'viewsize': changeViewSize(); break;
+		case 'changedim': changeDim(parseInt(el.dataset.dim)); break;
+		case 'moveindim': moveInDim(parseInt(el.dataset.dim)); break;
 	}
 }
 
-function onContextMenuEvent(ev,el) {
-	ev.preventDefault();
-	if (el.classList.contains("cell")) {
-		clickCell(ev,el);
-	}
+function onRootContextMenu(ev) {
+	ev.preventDefault(); //no browser menu inside the game
+	var el = ev.target.closest('[data-act="cell"]');
+	if (el!==null) clickCell(ev, el);
 }
 
-function onKeyDownEvent(ev,el) {
+function onRootMouseMove(ev) {
+	if (!ev.ctrlKey) return;
+	var el = ev.target.closest('[data-act="move"]');
+	if (el!==null) moveViewBy(el.dataset.dir);
+}
+
+function installEventListeners() {
+	var root = document.getElementById('infimine');
+	root.addEventListener('click', onRootClick);
+	root.addEventListener('contextmenu', onRootContextMenu);
+	root.addEventListener('mousemove', onRootMouseMove);
+	window.addEventListener('keydown', onKeyDownEvent);
+}
+
+function onKeyDownEvent(ev) {
+	if (ev.target instanceof Element && ev.target.closest('input,textarea,select')) return; //let arrows drive form fields
 	if (ev.key.substr(0,5)==="Arrow") { 
 		moveViewBy(ev.key.substr(5,1));
 	}
@@ -920,7 +945,7 @@ function loadFromDisk() {
 	fr.readAsText(files.item(0));
 }
 
-function openConfTab(evt, tabName) {
+function openConfTab(tabName, btn) {
 	var tabcontent = document.getElementsByClassName("conftabcontent");
 	for (let i = 0; i < tabcontent.length; i++) {
 		tabcontent[i].style.display = "none";
@@ -932,7 +957,7 @@ function openConfTab(evt, tabName) {
 	}
 
 	document.getElementById(tabName).style.display = "block";
-	evt.currentTarget.className += " active";
+	btn.className += " active";
 }
 
 function main(props) {
@@ -956,7 +981,6 @@ function restart() {
 	updateView();	
 
 	window.localStorage.setItem("lastGame", parseGameKey(getGameKey())[1]);
-	window.addEventListener("keydown", onKeyDownEvent);
 }
 
 function showMessage(m) {
@@ -997,14 +1021,15 @@ const infimine = {
 	toggleFavoriteGame: toggleFavoriteGame,
 	
 	openConfTab: openConfTab,
-	onMouseMoveEvent: onMouseMoveEvent,
-	onContextMenuEvent: onContextMenuEvent
+	onRootClick: onRootClick,
+	onRootContextMenu: onRootContextMenu
 	
 	//,field: getField
 };
 
 window.infimine = infimine;
 
+installEventListeners();
 infimine.main();
 
 </script>
