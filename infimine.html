@@ -144,6 +144,7 @@ table.move tr td {
 
 var game = {};
 var mainProps = {};
+var ui = { showConf: false, markOnClick: false }; // UI state - kept out of the model, merged into the save for compatibility
 var rng = Math.random; //random source used for bombs - injectable for deterministic tests/seeds
 
 /* storage keys - single source of truth; the exact strings must stay unchanged for compatibility */
@@ -202,9 +203,7 @@ function initValues() {
 
 		inGame: 0,
 		lives: game?game.defaultLives:null, //null
-		markOnClick: false, 
 		clickCount: 0,
-		showConf: false,
 	}
 	return g;
 }
@@ -446,7 +445,7 @@ function buildControls() {
 				'<td class="moveView moveRight" tooltip="Move right" data-act="move" data-dir="R">&#x21e8;</td>' +  //R
 			'</tr>' +
 			'<tr>' +
-				'<td class="marker marker-'+(game.markOnClick===true?'on':'off')+'" tooltip="Toggle open/mark" data-act="marker">&#9873;</td>' +
+				'<td class="marker marker-'+(ui.markOnClick===true?'on':'off')+'" tooltip="Toggle open/mark" data-act="marker">&#9873;</td>' +
 				'<td class="moveView moveDown" tooltip="Move down" data-act="move" data-dir="D">&#x21e9;</td>' +  //D
 				'<td class="conf" tooltip="Configuration" data-act="conf">&#9776;</td>' +
 			'</tr>' +
@@ -486,7 +485,7 @@ function templateItemGame(gName, gKey, gProps, gValue, isFav) {
 }
 
 function buildConfig() {
-	if (game.showConf!==true) return '';
+	if (ui.showConf!==true) return '';
 	/* https://www.w3schools.com/howto/howto_js_tabs.asp */
 	return '<div id="conf">'
 		+ '<div class="conftab">' + buildConfTabs() + '</div>'
@@ -658,7 +657,7 @@ function checkEndCondition() {
 
 function clickCell(ev,el) {
 	if (game.inGame===2) return; //finished ...
-	if ((ev.type=='click' && ev.ctrlKey) || (ev.type=='contextmenu') || (game.markOnClick===true)) {
+	if ((ev.type=='click' && ev.ctrlKey) || (ev.type=='contextmenu') || (ui.markOnClick===true)) {
 		changeMarkCell(el.dataset.key);
 	} else {
 		openCell(el.dataset.key);
@@ -808,12 +807,12 @@ function changeViewSize(newH, newW) {
 }
 
 function toggleMarker() {
-	game.markOnClick = !game.markOnClick;
+	ui.markOnClick = !ui.markOnClick;
 	updateView();
 }
 
 function toggleConfig() {
-	game.showConf = !game.showConf;
+	ui.showConf = !ui.showConf;
 	updateView();
 	
 	var t = document.getElementById("defaultConfTab");
@@ -943,7 +942,8 @@ function quickStartGames() {
 }
 
 function save() {
-	storageSet(STORAGE_KEY_GAME, JSON.stringify(game));
+	//ui state is merged in so the save keeps the legacy 15-key shape
+	storageSet(STORAGE_KEY_GAME, JSON.stringify(Object.assign({}, game, ui)));
 }
 
 function load() {
@@ -953,6 +953,9 @@ function load() {
 		if (g) showMessage('Saved game is corrupted - not loaded');
 		return;
 	}
+	//legacy saves carry the ui keys inside the game object
+	if (d['showConf']!==undefined) { ui.showConf = d['showConf']===true; delete d['showConf']; }
+	if (d['markOnClick']!==undefined) { ui.markOnClick = d['markOnClick']===true; delete d['markOnClick']; }
 	game = d;
 	checkEndCondition(); //a loaded game may already be over
 	updateView();
@@ -996,9 +999,11 @@ function loadFromDisk() {
 				var gv = initValues();
 				game = Object.assign({}, game, gv);
 
-				for (let k of ['field', 'viewDim', 'currDimCoord', 'inGame', 'lives', 'markOnClick', 'clickCount', 'showConf']) {
+				for (let k of ['field', 'viewDim', 'currDimCoord', 'inGame', 'lives', 'clickCount']) {
 					if (d[k]!==undefined) { game[k] = d[k]; }
 				}
+				ui.showConf = (d['showConf']===true); //ui keys of a legacy save go to the ui state
+				ui.markOnClick = (d['markOnClick']===true);
 				
 				checkEndCondition(); //a loaded game may already be over
 				updateView();	
@@ -1042,6 +1047,8 @@ function main(props) {
 }
 
 function restart() {
+	ui.showConf = false; //a fresh game starts with a clean UI state (as initValues did before)
+	ui.markOnClick = false;
 	var gv = initValues();
 	game = Object.assign({}, game, gv);
 	updateView();	
