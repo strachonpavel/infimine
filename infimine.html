@@ -144,11 +144,16 @@ table.move tr td {
 
 var game = {};
 var mainProps = {};
+var rng = Math.random; //random source used for bombs - injectable for deterministic tests/seeds
+
+function setRandom(f) {
+	rng = (typeof f === 'function') ? f : Math.random;
+}
 
 function Cell(props={}) {
 	
 	var isOpen = props['isOpen']===true?true:false;
-	var hasBomb = props['hasBomb']!==undefined?props['hasBomb']:(Math.random()<getBombDensity());
+	var hasBomb = props['hasBomb']!==undefined?props['hasBomb']:(rng()<getBombDensity());
 	var bombCount = props['bombCount'];
 	
 	return {
@@ -210,18 +215,19 @@ function getStrKeyFromKey(k) {
 
 function normalizeCoordinates(p) {
 	var currSpaceSize = game.spaceSize;
-	for (var i in p) {
+	var out = p.slice(); //pure: never modify the caller's array
+	for (var i in out) {
 		if (currSpaceSize[i]>0) {
 			//bounded
-			if (p[i]<0) return null;
-			if (p[i]>=currSpaceSize[i]) return null;
+			if (out[i]<0) return null;
+			if (out[i]>=currSpaceSize[i]) return null;
 		} else if (currSpaceSize[i]<0) {
 			//cyclic
-			p[i] =  ((p[i] % currSpaceSize[i]) + currSpaceSize[i]) % currSpaceSize[i];
+			out[i] =  ((out[i] % currSpaceSize[i]) + currSpaceSize[i]) % currSpaceSize[i];
 		}
 		// else (0, null) -> infinite
 	}
-	return p;
+	return out;
 }
 
 function getCell(sk, canBomb=true) {
@@ -248,6 +254,7 @@ function getResult() {
 }
 
 function getBombDensity() {
+	//pure read: derives density from the current state, does not touch it
 	var dens = game.bombDensity;
 	if (game.fixedBombs>0 && game.spaceSize.filter(x => x===null || x===0).length===0) {
 		var s = Math.abs(game.spaceSize.reduce((x,y)=>(x*y)) - Object.keys(game.field).length);
@@ -260,7 +267,6 @@ function getBombDensity() {
 			dens = 0; //no place left
 		}
 	}
-	game.bombDensity = dens;
 	return dens;
 }
 
@@ -272,7 +278,7 @@ function initViewCenter(viewSize) {
 function getNeighbours(sk) {
 	var n = [];
 	const selViewCell = getKeyFromStrKey(sk); //from view
-	const selCell = game.currDimCoord;
+	const selCell = game.currDimCoord.slice(); //pure: work on a copy, do not move the cursor
 	selCell[game.viewDim[0]] = selViewCell[0];
 	selCell[game.viewDim[1]] = selViewCell[1];
 	
@@ -582,9 +588,7 @@ function buildConfig() {
 }
 
 function updateView() {
-	//if (game.inGame===2) return; //finished ...
-	checkEndCondition()
-
+	//pure render: reads the model, never modifies it (end condition is checked by the action handlers)
 	var el = document.getElementById('infimine');
 	
 	var s = '';
@@ -623,6 +627,7 @@ function clickCell(ev,el) {
 	
 	game.clickCount += 1;
 
+	checkEndCondition(); //evaluate the game state after the action, before rendering
 	updateView();
 
 }
@@ -880,6 +885,7 @@ function load() {
 	let g = window.localStorage.getItem("game");
 	if (g) {
 		game = JSON.parse(g);
+		checkEndCondition(); //a loaded game may already be over
 		updateView();
 	}
 }
@@ -935,6 +941,7 @@ function loadFromDisk() {
 				if (d['clickCount']!==undefined) { game['clickCount'] = d['clickCount']; }
 				if (d['showConf']!==undefined) { game['showConf'] = d['showConf']; }
 				
+				checkEndCondition(); //a loaded game may already be over
 				updateView();	
 			
 			} catch(er) {
@@ -1022,7 +1029,8 @@ const infimine = {
 	
 	openConfTab: openConfTab,
 	onRootClick: onRootClick,
-	onRootContextMenu: onRootContextMenu
+	onRootContextMenu: onRootContextMenu,
+	setRandom: setRandom
 	
 	//,field: getField
 };
