@@ -435,19 +435,19 @@ function buildView() {
 function buildControls() {
 	var s = '<table class="move">' + 
 			'<tr>' +
-				'<td class="find" tooltip="Find/Center" data-act="find">&#128270;</td>' +  //  &#10687;  &#128270;
-				'<td class="moveView moveUp" tooltip="Move up" data-act="move" data-dir="U">&#x21e7;</td>' +  //U
-				'<td class="restart" tooltip="Restart" data-act="restart">&#x21bb;</td>' +
+				'<td class="find" title="Find/Center" data-act="find">&#128270;</td>' +  //  &#10687;  &#128270;
+				'<td class="moveView moveUp" title="Move up" data-act="move" data-dir="U">&#x21e7;</td>' +  //U
+				'<td class="restart" title="Restart" data-act="restart">&#x21bb;</td>' +
 			'</tr>' +
 			'<tr>' +
-				'<td class="moveView moveLeft" tooltip="Move left" data-act="move" data-dir="L">&#x21e6;</td>' +  //L
+				'<td class="moveView moveLeft" title="Move left" data-act="move" data-dir="L">&#x21e6;</td>' +  //L
 				'<td>'+buildView()+'</td>' +
-				'<td class="moveView moveRight" tooltip="Move right" data-act="move" data-dir="R">&#x21e8;</td>' +  //R
+				'<td class="moveView moveRight" title="Move right" data-act="move" data-dir="R">&#x21e8;</td>' +  //R
 			'</tr>' +
 			'<tr>' +
-				'<td class="marker marker-'+(ui.markOnClick===true?'on':'off')+'" tooltip="Toggle open/mark" data-act="marker">&#9873;</td>' +
-				'<td class="moveView moveDown" tooltip="Move down" data-act="move" data-dir="D">&#x21e9;</td>' +  //D
-				'<td class="conf" tooltip="Configuration" data-act="conf">&#9776;</td>' +
+				'<td class="marker marker-'+(ui.markOnClick===true?'on':'off')+'" title="Toggle open/mark" data-act="marker">&#9873;</td>' +
+				'<td class="moveView moveDown" title="Move down" data-act="move" data-dir="D">&#x21e9;</td>' +  //D
+				'<td class="conf" title="Configuration" data-act="conf">&#9776;</td>' +
 			'</tr>' +
 		'</table>'; 
 
@@ -474,11 +474,11 @@ function buildInfo() {
 function templateItemGame(gName, gKey, gProps, gValue, isFav) {
 	let s = gName; 
 	if (gKey!==null && gKey!==undefined) {
-		s += ` <input type="button" name="newgame${gKey}" tooltip="New game" value="New game" data-act="newgame" data-key="${(gProps!==null && gProps!==undefined)?gProps:gKey}">`; 
+		s += ` <input type="button" name="newgame${gKey}" title="New game" value="New game" data-act="newgame" data-key="${(gProps!==null && gProps!==undefined)?gProps:gKey}">`; 
 	}
 	if (isFav!==null && isFav!==undefined) {
 		let ft = isFav?"Remove from Favorites":"Add to Favorites";
-		s += ` <input type="button" name="favtoggle${gKey}" tooltip="${ft}" value="${ft}" data-act="fav" data-key="${gValue}">`; 
+		s += ` <input type="button" name="favtoggle${gKey}" title="${ft}" value="${ft}" data-act="fav" data-key="${gValue}">`; 
 	}
 	
 	return s;
@@ -534,14 +534,14 @@ function buildConfNewGame() {
 	s += '</ul>';
 	s += '<br>'; 
 	s += '<h4>My Game</h4>'; 
-	s += `<span>Space Height:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceHi" tooltip="infinite" ${game.spaceSize[0]==0?'checked':''}><br>`; 
-	s += `<input type="number" id="ngSpaceH" tooltip="Space height" value="${Math.abs(game.spaceSize[0])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceHc" tooltip="cyclic" ${game.spaceSize[0]<0?'checked':''}><br>`;
-	s += `<span>Space Width:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceWi" tooltip="infinite" ${game.spaceSize[1]==0?'checked':''}><br>`; 
-	s += `<input type="number" id="ngSpaceW" tooltip="Space width" value="${Math.abs(game.spaceSize[1])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceWc" tooltip="cyclic" ${game.spaceSize[1]<0?'checked':''}><br>`;
-	s += `Lives: <input type="number" id="ngLives" tooltip="Lives" value="${game.defaultLives}" min="0" max="5"><br>`;
-	s += `Bomb density (0-100%): <input type="number" id="ngBombDensity" tooltip="Bomb density" value="${(100*game.bombDensity).toFixed(2)}" min="0" max="99.99" step="0.01"><br>`;
-	s += `Bombs: <input type="number" id="ngBombs" tooltip="Bombs" value="${game.fixedBombs}" min="0"><br>`;
-	s += '<input type="button" name="mynewgame" tooltip="New game" value="New game" data-act="mynewgame">';
+	s += `<span>Space Height:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceHi" title="infinite" ${game.spaceSize[0]==0?'checked':''}><br>`; 
+	s += `<input type="number" id="ngSpaceH" title="Space height" value="${Math.abs(game.spaceSize[0])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceHc" title="cyclic" ${game.spaceSize[0]<0?'checked':''}><br>`;
+	s += `<span>Space Width:</span>&nbsp;infinite: <input type="checkbox" id="ngSpaceWi" title="infinite" ${game.spaceSize[1]==0?'checked':''}><br>`; 
+	s += `<input type="number" id="ngSpaceW" title="Space width" value="${Math.abs(game.spaceSize[1])}" min="1">&nbsp;cyclic: <input type="checkbox" id="ngSpaceWc" title="cyclic" ${game.spaceSize[1]<0?'checked':''}><br>`;
+	s += `Lives: <input type="number" id="ngLives" title="Lives" value="${game.defaultLives}" min="0" max="5"><br>`;
+	s += `Bomb density (0-100%): <input type="number" id="ngBombDensity" title="Bomb density" value="${(100*game.bombDensity).toFixed(2)}" min="0" max="99.99" step="0.01"><br>`;
+	s += `Bombs: <input type="number" id="ngBombs" title="Bombs" value="${game.fixedBombs}" min="0"><br>`;
+	s += '<input type="button" name="mynewgame" title="New game" value="New game" data-act="mynewgame">';
 	s += '</p>'; 
 	s += '</div>';
 	return s;
@@ -551,12 +551,12 @@ function buildConfSaveLoad() {
 	var s = '<div id="ConfSaveLoad" class="conftabcontent">';
 	s += '<h3>Save/Load</h3>'; 
 	s += '<p>'; 
-	s += '<input type="button" name="save" tooltip="Save the game" value="Save" data-act="save">';
-	s += '<input type="button" name="load" tooltip="Load the game" value="Load" data-act="load">';
+	s += '<input type="button" name="save" title="Save the game" value="Save" data-act="save">';
+	s += '<input type="button" name="load" title="Load the game" value="Load" data-act="load">';
 	s += '<br>';
-	s += '<input type="button" name="saveDisk" tooltip="Save the game to disk" value="Save To Disk" data-act="savedisk">';
-	s += '<input type="button" name="loadDisk" tooltip="Load the game from disk" value="Load From Disk" data-act="loaddisk">';
-	s += '<input type="file" id="loadDiskFile" name="loadDiskFile" tooltip="Choose the file from disk" value="infimine.save">';
+	s += '<input type="button" name="saveDisk" title="Save the game to disk" value="Save To Disk" data-act="savedisk">';
+	s += '<input type="button" name="loadDisk" title="Load the game from disk" value="Load From Disk" data-act="loaddisk">';
+	s += '<input type="file" id="loadDiskFile" name="loadDiskFile" title="Choose the file from disk" value="infimine.save">';
 	s += '</p>'; 
 	s += '</div>';
 	return s;
@@ -571,7 +571,7 @@ function buildConfBestScore() {
 		s += `<tr><td>${i[0]}</td><td>${(new Date(i[2])).toLocaleString()}</td></tr>`;
 	}
 	s += '</table>';
-	s += '<br><input type="button" name="resetScire" tooltip="Reste Score List" value="Reset Score List" data-act="resetscore">';
+	s += '<br><input type="button" name="resetScire" title="Reste Score List" value="Reset Score List" data-act="resetscore">';
 	s += '</p>'; 
 	s += '</div>';
 	return s;
@@ -607,17 +607,17 @@ function buildConfInfo() {
 	s += '</ul>';
 	s += '</p>';
 	s += '<h4>View Size</h4>';
-	s += `<input type="number" id="viewH" tooltip="View height" value="${game.viewSize[0]}" min="1" max="99">`;
-	s += `<input type="number" id="viewW" tooltip="View width" value="${game.viewSize[1]}" min="1" max="99">`;
-	s += '<input type="button" name="changeViewSize" tooltip="Change view size" value="Change view size (height/width)" data-act="viewsize">';
+	s += `<input type="number" id="viewH" title="View height" value="${game.viewSize[0]}" min="1" max="99">`;
+	s += `<input type="number" id="viewW" title="View width" value="${game.viewSize[1]}" min="1" max="99">`;
+	s += '<input type="button" name="changeViewSize" title="Change view size" value="Change view size (height/width)" data-act="viewsize">';
 	s += '<br>';
 	s += '<h4>Space</h4>'; 
 	s += `dimensions: ${game.spaceSize.length}<br>`;
-	s += `view dim 1: ${game.viewDim[0]}&nbsp;<input type="button" tooltip="Change Dim 1" value="Change Dim 1" data-act="changedim" data-dim="0"><br>`;
-	s += `view dim 2: ${game.viewDim[1]}&nbsp;<input type="button" tooltip="Change Dim 2" value="Change Dim 2" data-act="changedim" data-dim="1"><br>`;
+	s += `view dim 1: ${game.viewDim[0]}&nbsp;<input type="button" title="Change Dim 1" value="Change Dim 1" data-act="changedim" data-dim="0"><br>`;
+	s += `view dim 2: ${game.viewDim[1]}&nbsp;<input type="button" title="Change Dim 2" value="Change Dim 2" data-act="changedim" data-dim="1"><br>`;
 	s += 'curr coordinates: ';
 	for (let i in game.currDimCoord) {
-		s += '&nbsp;'+((game.viewDim.indexOf(parseInt(i))>-1)?game.currDimCoord[i]:('<input type="button" tooltip="Move In Dim '+i+'" value="'+game.currDimCoord[i]+'" data-act="moveindim" data-dim="'+i+'">'))+'&nbsp;';
+		s += '&nbsp;'+((game.viewDim.indexOf(parseInt(i))>-1)?game.currDimCoord[i]:('<input type="button" title="Move In Dim '+i+'" value="'+game.currDimCoord[i]+'" data-act="moveindim" data-dim="'+i+'">'))+'&nbsp;';
 	}
 	s += '</p>'; 
 	s += '</div>';
