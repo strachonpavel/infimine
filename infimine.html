@@ -746,7 +746,7 @@ function checkEndCondition() {
 
 function clickCell(ev,el) {
 	if (game.inGame===2) return; //finished ...
-	if (game.timePaused===true) { showMessage('Game paused - resume to play'); return; } //2a: pause blocks play
+	if (game.timePaused===true) { timerToggle(); return; } //a click in the field ends the pause - it does not act on the cell itself
 	timerStart(); //the clock starts with the first interaction in the field
 	if ((ev.type=='click' && ev.ctrlKey) || (ev.type=='contextmenu') || (ui.markOnClick===true)) {
 		changeMarkCell(el.dataset.key);
