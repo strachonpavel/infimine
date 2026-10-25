@@ -360,7 +360,7 @@ function getResult() {
 	
 	var sc = (1000*ccr*Math.sqrt(lr*(bo+1))).toFixed(0);
 
-	return {score:sc, bombs:bo, marks:m, time:getElapsed()}; //time is part of the result (4b), score formula unchanged
+	return {score:sc, bombs:bo, marks:m, time:getElapsed()}; //lower is better: fewer clicks per flag, fewer lives lost, fewer bombs hit
 }
 
 function getBombDensity() {
@@ -662,7 +662,7 @@ function buildConfBestScore() {
 	var s = '<div id="ConfBestScore" class="conftabcontent">';
 	s += '<h3>Best Score</h3>'; 
 	s += '<p>'; 
-	s += '<table><tr><td>Score</td><td>Time</td><td>Date</td></tr>';
+	s += '<table><tr><td title="Lower is better">Score</td><td>Time</td><td>Date</td></tr>';
 	for (let i of getBestScoreList(getGameKey())) {
 		//records from before the timer (4b) have no time - show a dash
 		var rt = (i[1] && typeof i[1]['time']==='number')?formatTime(i[1]['time']):'&ndash;';
@@ -975,10 +975,18 @@ function parseGameKey(k) {
 	
 }
 
+function compareScoreEntries(x, y) {
+	var sx = parseInt(x[0]);
+	var sy = parseInt(y[0]);
+	if (sx !== sy) return sx - sy; //lower score is better - the best one comes first
+	return (new Date(x[2])) - (new Date(y[2])); //older date first on ties
+}
+
 function getBestScoreList(k) {
 	let s = storageGet(STORAGE_KEY_BEST_SCORE_PREFIX + k);
 	let scoreList = parseJSONSafe(s, []);
-	return Array.isArray(scoreList) ? scoreList : [];
+	if (!Array.isArray(scoreList)) return [];
+	return scoreList.sort(compareScoreEntries); //lists stored by older versions may still be in the wrong order
 }
 
 function setBestScoreList() {
@@ -988,13 +996,8 @@ function setBestScoreList() {
 	let newScore = getResult();
 	if (game.inGame===2 && newScore) {
 		scoreList.push([newScore['score'], newScore, new Date()]);
-		scoreList.sort((x, y) => {
-			var sx = parseInt(x[0]);
-			var sy = parseInt(y[0]);
-			if (sx !== sy) return sy - sx; //higher score first
-			return (new Date(x[2])) - (new Date(y[2])); //older date first
-		});
-		scoreList = scoreList.slice(0,5);  //only 5 best score
+		scoreList.sort(compareScoreEntries);
+		scoreList = scoreList.slice(0,5);  //only the 5 best (i.e. lowest) scores are kept
 		storageSet(STORAGE_KEY_BEST_SCORE_PREFIX + k, JSON.stringify(scoreList));
 	}
 }
