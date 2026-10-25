@@ -111,6 +111,12 @@ table.minefield tr td {
 	border-color: white;
 }
 
+.pausebtn {
+	margin-left: 6px;
+	font-size: 11px;
+	cursor: pointer;
+}
+
 /* controls */
 /*
 table.move {
@@ -204,8 +210,84 @@ function initValues() {
 		inGame: 0,
 		lives: game?game.defaultLives:null, //null
 		clickCount: 0,
+		//timer - the clock is derived from timestamps, it is never incremented by ticks
+		timeElapsed: 0,      //ms accumulated outside the running segment
+		timeRunningSince: 0, //epoch ms of the current running segment (0 = not running)
+		timePaused: false,
+		timeStarted: false,
 	}
 	return g;
+}
+
+/* timer - start on the first click, pauseable, frozen at game end, kept in the save */
+function formatTime(ms) {
+	var t = Math.max(0, Math.floor(ms/1000));
+	var h = Math.floor(t/3600);
+	var m = Math.floor((t%3600)/60);
+	var s = t%60;
+	var p = n => (n<10?'0':'')+n;
+	return (h>0)?(h+':'+p(m)+':'+p(s)):(m+':'+p(s));
+}
+
+function timerRunning() {
+	return (game.timeStarted===true && game.timePaused!==true && game.inGame!==2 && game.timeRunningSince>0);
+}
+
+function getElapsed() {
+	return (game.timeElapsed||0) + (timerRunning()?(Date.now() - game.timeRunningSince):0);
+}
+
+function timerStart() { //called from clickCell - the clock measures real play only (1a)
+	if (game.timeStarted===true) return;
+	game.timeStarted = true;
+	game.timeRunningSince = Date.now();
+}
+
+function timerFold() { //materialize the running segment (before serializing a save)
+	if (timerRunning()) {
+		game.timeElapsed += Date.now() - game.timeRunningSince;
+		game.timeRunningSince = Date.now();
+	}
+}
+
+function timerFreeze() { //game over - lock the final time (must not check inGame: it is already 2 when called)
+	if (game.timeStarted===true && game.timeRunningSince>0) {
+		game.timeElapsed += Date.now() - game.timeRunningSince;
+	}
+	game.timeRunningSince = 0;
+}
+
+function timerNormalize() { //after load: continue from the stored value, time away from the game does not count (3a)
+	game.timeElapsed = (typeof game.timeElapsed==='number' && game.timeElapsed>0)?game.timeElapsed:0;
+	game.timePaused = (game.timePaused===true);
+	game.timeStarted = (game.timeStarted===true);
+	if (game.timeStarted && game.timePaused!==true && game.inGame!==2) {
+		game.timeRunningSince = Date.now(); //restart the segment now - no offline time
+	} else {
+		game.timeRunningSince = 0;
+	}
+}
+
+function timerToggle() {
+	if (game.inGame===2 || game.timeStarted!==true) return; //nothing to pause before the first click / after the end
+	if (game.timePaused===true) {
+		game.timePaused = false;
+		game.timeRunningSince = Date.now();
+	} else {
+		timerFold();
+		game.timePaused = true;
+		game.timeRunningSince = 0;
+	}
+	updateView();
+}
+
+var tickerId = null;
+function startTicker() { //refresh only the time label, never the whole view
+	if (tickerId!==null) return;
+	tickerId = setInterval(function() {
+		var el = document.getElementById('gameTime');
+		if (el) el.textContent = formatTime(getElapsed());
+	}, 1000);
 }
 
 function getKeyFromStrKey(sk) {
@@ -268,7 +350,7 @@ function getResult() {
 	
 	var sc = (1000*ccr*Math.sqrt(lr*(bo+1))).toFixed(0);
 
-	return {score:sc, bombs:bo, marks:m};
+	return {score:sc, bombs:bo, marks:m, time:getElapsed()}; //time is part of the result (4b), score formula unchanged
 }
 
 function getBombDensity() {
@@ -462,11 +544,14 @@ function buildInfo() {
 	s += `<div>${templateItemGame(cg[0], cg[1], null, gk, (fg!=null && fg!==undefined && fg.indexOf(gk)>-1))}</div>`;
 	if (game.inGame===2) {
 		var r = getResult();
-		s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']})</div>`;
+		s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']}, Time: ${formatTime(r['time'])})</div>`;
 	} else {
 		s += `<div>${((allCellKeys().length>0)?'Running ...':'Click to start')}</div>`;
 	}
 	s += `<div>Lives left: ${((game.defaultLives>0)?((game.lives>=0)?game.lives:''):'&infin;')}</div>`;
+	s += `<div>Time: <span id="gameTime">${formatTime(getElapsed())}</span>`
+		+ ((game.timeStarted===true && game.inGame!==2)?` <button class="pausebtn" data-act="pause" title="${(game.timePaused===true)?'Resume':'Pause'}">${(game.timePaused===true)?'&#9654;':'&#9208;'}</button>`:'')
+		+ ((game.timePaused===true)?' (paused)':'') + `</div>`;
 	s += `<div>Clicks: ${game.clickCount}</div>`;
 	return s;
 }
@@ -566,9 +651,11 @@ function buildConfBestScore() {
 	var s = '<div id="ConfBestScore" class="conftabcontent">';
 	s += '<h3>Best Score</h3>'; 
 	s += '<p>'; 
-	s += '<table><tr><td>Score</td><td>Date</td></tr>';
+	s += '<table><tr><td>Score</td><td>Time</td><td>Date</td></tr>';
 	for (let i of getBestScoreList(getGameKey())) {
-		s += `<tr><td>${i[0]}</td><td>${(new Date(i[2])).toLocaleString()}</td></tr>`;
+		//records from before the timer (4b) have no time - show a dash
+		var rt = (i[1] && typeof i[1]['time']==='number')?formatTime(i[1]['time']):'&ndash;';
+		s += `<tr><td>${i[0]}</td><td>${rt}</td><td>${(new Date(i[2])).toLocaleString()}</td></tr>`;
 	}
 	s += '</table>';
 	s += '<br><input type="button" name="resetScire" title="Reste Score List" value="Reset Score List" data-act="resetscore">';
@@ -644,12 +731,14 @@ function checkEndCondition() {
 	game.lives = game.lives>0?game.lives:0;
 	if (game.defaultLives>0 && game.lives<=0) { 
 		game.inGame = 2; 
+		timerFreeze(); //lock the final time before the score reads it
 		setBestScoreList();
 	} //end
 	
 	var leftOpen = countWhere(cellIsOpenable);
 	if (allCellKeys().length>0 && leftOpen<=0) {
 		game.inGame = 2;
+		timerFreeze();
 		setBestScoreList();
 	}
 	return (game.inGame==2);
@@ -657,6 +746,8 @@ function checkEndCondition() {
 
 function clickCell(ev,el) {
 	if (game.inGame===2) return; //finished ...
+	if (game.timePaused===true) { showMessage('Game paused - resume to play'); return; } //2a: pause blocks play
+	timerStart(); //the clock starts with the first interaction in the field
 	if ((ev.type=='click' && ev.ctrlKey) || (ev.type=='contextmenu') || (ui.markOnClick===true)) {
 		changeMarkCell(el.dataset.key);
 	} else {
@@ -732,6 +823,7 @@ function onRootClick(ev) {
 		case 'move': moveViewBy(el.dataset.dir); break;
 		case 'restart': restart(); break;
 		case 'marker': toggleMarker(); break;
+		case 'pause': timerToggle(); break;
 		case 'conf': toggleConfig(); break;
 		case 'newgame': newGame(el.dataset.key); break;
 		case 'fav': toggleFavoriteGame(el.dataset.key); break;
@@ -766,6 +858,7 @@ function installEventListeners() {
 	root.addEventListener('contextmenu', onRootContextMenu);
 	root.addEventListener('mousemove', onRootMouseMove);
 	window.addEventListener('keydown', onKeyDownEvent);
+	startTicker(); //keep the visible time fresh between renders
 }
 
 function onKeyDownEvent(ev) {
@@ -941,9 +1034,14 @@ function quickStartGames() {
 	return ['[[8,8],3,10]', '[[16,16],3,40]', '[[16,30],3,99]', '', '[[-8,-8],3,10]', '[[-16,-16],3,40]', '[[-16,-30],3,99]'];
 }
 
+function serializeGame() {
+	timerFold(); //the running segment must be materialized into timeElapsed before writing
+	return JSON.stringify(Object.assign({}, game, ui));
+}
+
 function save() {
-	//ui state is merged in so the save keeps the legacy 15-key shape
-	storageSet(STORAGE_KEY_GAME, JSON.stringify(Object.assign({}, game, ui)));
+	//ui state is merged in so the save keeps the legacy key shape
+	storageSet(STORAGE_KEY_GAME, serializeGame());
 }
 
 function load() {
@@ -957,6 +1055,7 @@ function load() {
 	if (d['showConf']!==undefined) { ui.showConf = d['showConf']===true; delete d['showConf']; }
 	if (d['markOnClick']!==undefined) { ui.markOnClick = d['markOnClick']===true; delete d['markOnClick']; }
 	game = d;
+	timerNormalize(); //before the end check, so a game ending here reads a sane time
 	checkEndCondition(); //a loaded game may already be over
 	updateView();
 }
@@ -965,7 +1064,7 @@ function saveToDisk() {
 	//var contentType = 'text/plain';
 	var contentType = 'application/json';
 	var filename = 'infimine.save';
-	var content = new Blob([JSON.stringify(game)], {type: contentType});
+	var content = new Blob([serializeGame()], {type: contentType});
 	if (window.navigator.msSaveOrOpenBlob) // IE10+
 		window.navigator.msSaveOrOpenBlob(content, filename);
 	else { // Others
@@ -999,12 +1098,14 @@ function loadFromDisk() {
 				var gv = initValues();
 				game = Object.assign({}, game, gv);
 
-				for (let k of ['field', 'viewDim', 'currDimCoord', 'inGame', 'lives', 'clickCount']) {
+				for (let k of ['field', 'viewDim', 'currDimCoord', 'inGame', 'lives', 'clickCount', 'timeElapsed', 'timePaused', 'timeStarted']) {
+					//timeRunningSince is not copied on purpose - timerNormalize restarts the segment now (3a)
 					if (d[k]!==undefined) { game[k] = d[k]; }
 				}
 				ui.showConf = (d['showConf']===true); //ui keys of a legacy save go to the ui state
 				ui.markOnClick = (d['markOnClick']===true);
 				
+				timerNormalize();
 				checkEndCondition(); //a loaded game may already be over
 				updateView();	
 			
@@ -1096,7 +1197,10 @@ const infimine = {
 	openConfTab: openConfTab,
 	onRootClick: onRootClick,
 	onRootContextMenu: onRootContextMenu,
-	setRandom: setRandom
+	setRandom: setRandom,
+	getElapsed: getElapsed,
+	timerToggle: timerToggle,
+	formatTime: formatTime
 	
 	//,field: getField
 };
