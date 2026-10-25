@@ -21,6 +21,16 @@ table.noplay {
 	background-color: lightgray;
 }
 
+/* paused: the field is frozen - grayed like game over, but the cells visibly quiet down
+   (clicking the field ends the pause) */
+table.minefield.paused {
+	background-color: lightgray;
+}
+table.minefield.paused tr td {
+	filter: grayscale(0.9);
+	opacity: 0.6;
+}
+
 table.minefield tr {
 	height: 25px;
 }
@@ -487,7 +497,8 @@ function moveInDim(d) {
 
 
 function buildView() {
-	var s = '<table class="minefield '+((game.inGame===2)?'noplay':'')+'">';
+	//ended -> flat gray (noplay); paused -> gray plus visibly quiet cells, a click on the field resumes
+	var s = '<table class="minefield '+((game.inGame===2)?'noplay':((game.timePaused===true)?'paused':''))+'">';
 	for (var r of [...Array(game.viewSize[0]).keys()].map(x => x + game.viewCenter[0])) {
 		s += '<tr>';
 		for (var c of [...Array(game.viewSize[1]).keys()].map(x => x + game.viewCenter[1])) {
