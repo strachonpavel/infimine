@@ -769,7 +769,7 @@ function clickCell(ev,el) {
 
 	checkEndCondition(); //evaluate the game state after the action, before rendering
 	updateView();
-
+	save(); //auto-save: closing the tab keeps the progress
 }
 
 function newGame(gd) {
@@ -863,12 +863,19 @@ function onRootMouseMove(ev) {
 	if (el!==null) moveViewBy(el.dataset.dir);
 }
 
+function onVisibilityChange() {
+	//auto-pause when the tab is hidden - the clock measures play, not idle time;
+	//coming back does not resume by itself, a click in the field (or the button) does
+	if (document.hidden===true && timerRunning()===true) timerToggle();
+}
+
 function installEventListeners() {
 	var root = document.getElementById('infimine');
 	root.addEventListener('click', onRootClick);
 	root.addEventListener('contextmenu', onRootContextMenu);
 	root.addEventListener('mousemove', onRootMouseMove);
 	window.addEventListener('keydown', onKeyDownEvent);
+	document.addEventListener('visibilitychange', onVisibilityChange);
 	startTicker(); //keep the visible time fresh between renders
 }
 
@@ -1058,12 +1065,12 @@ function save() {
 	storageSet(STORAGE_KEY_GAME, serializeGame());
 }
 
-function load() {
+function load() { //returns true when a saved game was loaded
 	let g = storageGet(STORAGE_KEY_GAME);
 	let d = parseJSONSafe(g, null);
 	if (!isValidGame(d)) {
 		if (g) showMessage('Saved game is corrupted - not loaded');
-		return;
+		return false;
 	}
 	//legacy saves carry the ui keys inside the game object
 	if (d['showConf']!==undefined) { ui.showConf = d['showConf']===true; delete d['showConf']; }
@@ -1072,6 +1079,7 @@ function load() {
 	timerNormalize(); //before the end check, so a game ending here reads a sane time
 	checkEndCondition(); //a loaded game may already be over
 	updateView();
+	return true;
 }
 
 function saveToDisk() {
@@ -1148,6 +1156,9 @@ function openConfTab(tabName, btn) {
 
 function main(props) {
 	if (!props) {
+		//auto-restore the saved game - a reload lands exactly where the tab was closed;
+		//an already finished game does not count, a fresh one is started below
+		if (load()===true && game.inGame!==2) return;
 		let lg = storageGet(STORAGE_KEY_LAST_GAME);
 		if (lg && lg.split('_').map(Number).length==4) {
 			newGame(lg);
@@ -1169,6 +1180,7 @@ function restart() {
 	updateView();	
 
 	storageSet(STORAGE_KEY_LAST_GAME, parseGameKey(getGameKey())[1]);
+	save(); //auto-save the fresh game too - a reload restores what is on screen
 }
 
 function showMessage(m) {
@@ -1214,7 +1226,8 @@ const infimine = {
 	setRandom: setRandom,
 	getElapsed: getElapsed,
 	timerToggle: timerToggle,
-	formatTime: formatTime
+	formatTime: formatTime,
+	onVisibilityChange: onVisibilityChange
 	
 	//,field: getField
 };
