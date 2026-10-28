@@ -252,6 +252,7 @@ var game = {};
 var mainProps = {};
 var ui = { showConf: false, markOnClick: false }; // UI state - kept out of the model, merged into the save for compatibility
 var rng = Math.random; //random source used for bombs - injectable for deterministic tests/seeds
+var newBest = { score: false, time: false }; //set when the last result beat the records - shown in the END line
 
 /* storage keys - single source of truth; the exact strings must stay unchanged for compatibility */
 const STORAGE_KEY_GAME = 'game';
@@ -651,7 +652,9 @@ function buildInfo() {
 	s += `<div>${templateItemGame(cg[0], cg[1], null, gk, (fg!=null && fg!==undefined && fg.indexOf(gk)>-1))}</div>`;
 	if (game.inGame===2) {
 		var r = getResult();
-		s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']}, Time: ${formatTime(r['time'])})</div>`;
+		s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']}, Time: ${formatTime(r['time'])})`
+			+ (newBest.score?' &#9733; NEW BEST SCORE!':'')  //&#9733;
+			+ (newBest.time?' &#9733; NEW BEST TIME!':'') + `</div>`;  //&#9733;
 	} else {
 		s += `<div>${((allCellKeys().length>0)?'Running ...':'Click to start')}</div>`;
 	}
@@ -1098,6 +1101,11 @@ function setBestScoreList() {
 
 	let newScore = getResult();
 	if (game.inGame===2 && newScore) {
+		//compare with the current records BEFORE the new entry is written (the badges show in the END line)
+		newBest.score = (scoreList.length===0) || (parseInt(newScore['score']) < parseInt(scoreList[0][0])); //lower score is better
+		const times = scoreList.filter(e => e[1] && typeof e[1]['time']==='number').map(e => e[1]['time']);
+		newBest.time = (typeof newScore['time']==='number' && newScore['time']>0) &&
+			(times.length===0 || newScore['time'] < Math.min.apply(null, times)); //faster time is better
 		scoreList.push([newScore['score'], newScore, new Date()]);
 		scoreList.sort(compareScoreEntries);
 		scoreList = scoreList.slice(0,5);  //only the 5 best (i.e. lowest) scores are kept
@@ -1271,6 +1279,7 @@ function main(props) {
 function restart() {
 	ui.showConf = false; //a fresh game starts with a clean UI state (as initValues did before)
 	ui.markOnClick = false;
+	newBest = { score: false, time: false }; //no badges until the new game ends
 	var gv = initValues();
 	game = Object.assign({}, game, gv);
 	updateView();	

@@ -81,6 +81,7 @@ run "event delegation / controls" reg regression.js
 run "model purity / deterministic RNG" pure pure.js
 run "timer (start, pause, save, end)" timer timer.js
 run "score (lower is better)" score score.js
+run "new best badges" best best.js
 run "auto-save + auto-restore + tab pause" autosave autosave.js
 run "end of game reveal (mines, wrong flags)" end endreveal.js
 run "dark theme (media query)" dark darkmode.js
