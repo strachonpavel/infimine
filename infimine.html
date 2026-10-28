@@ -845,15 +845,15 @@ function checkEndCondition() {
 	game.lives = game.lives>0?game.lives:0;
 	if (game.defaultLives>0 && game.lives<=0) { 
 		game.inGame = 2; 
-		timerFreeze(); //lock the final time before the score reads it
-		setBestScoreList();
-	} //end
-	
-	const leftOpen = countWhere(cellIsOpenable);
-	if (allCellKeys().length>0 && leftOpen<=0) {
-		game.inGame = 2;
-		timerFreeze();
-		setBestScoreList();
+		timerFreeze(); //lock the final time
+		//a lost game records NO best score - only a finished (won) game counts
+	} else {
+		const leftOpen = countWhere(cellIsOpenable);
+		if (allCellKeys().length>0 && leftOpen<=0) {
+			game.inGame = 2;
+			timerFreeze(); //lock the final time before the score reads it
+			setBestScoreList(); //only the win is written to the best score list
+		}
 	}
 	return (game.inGame==2);
 }

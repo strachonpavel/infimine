@@ -48,6 +48,31 @@ const storedScores = () => { const k = Object.keys(localStorage).filter(x=>x.sta
     const got2 = storedScores();
     log('keepsAllWhen5thWorse=' + (got2.length === 5 && JSON.stringify(got2.slice(0,4)) === '[50,60,70,80]' ? 'ok' : 'FAILED:'+JSON.stringify(got2)));
     log('newScoreLast=' + (got2[4] >= 80 ? 'ok' : 'FAILED:'+JSON.stringify(got2)));
+
+    /* E: a LOST game must NOT be recorded - only a finished (won) game counts */
+    const beforeLoss = JSON.stringify(storedScores());
+    window.infimine.setRandom(() => 0); //every new cell is a mine -> certain loss
+    window.infimine.newGame('8_8_3_10');
+    document.querySelector('td[data-act="cell"]').dispatchEvent(new MouseEvent('click',{bubbles:true})); //first open: safe region, game running
+    const clickClosed = () => { //re-query every time: the view is re-rendered after each click
+      const c = document.querySelector('td.cell.shadow[data-act="cell"]');
+      c.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+    };
+    clickClosed(); clickClosed(); clickClosed(); //3 mines -> lives gone -> game over
+    log('lossEndedGame=' + (endLine().includes('END --- Score') ? 'ok' : 'FAILED:'+endLine().slice(0,60)));
+    log('lossShowsScoreLine=' + (endLine().includes('Score:') ? 'ok' : 'FAILED'));
+    log('lossNotRecorded=' + (JSON.stringify(storedScores()) === beforeLoss ? 'ok' : 'FAILED got='+JSON.stringify(storedScores())));
+
+    /* F: a loss shows no NEW BEST badge either */
+    log('lossNoBestBadge=' + (!endLine().includes('NEW BEST') ? 'ok' : 'FAILED:'+endLine().slice(-60)));
+
+    /* G: the very next WIN is still recorded normally (clean list -> exactly one entry) */
+    localStorage.removeItem('bestScoreList_'+gk);
+    window.infimine.setRandom(() => 1); //no mines -> guaranteed win
+    window.infimine.newGame('8_8_3_10');
+    document.querySelector('td[data-act="cell"]').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+    const afterWin = storedScores();
+    log('winRecordedAfterLoss=' + (afterWin.length === 1 ? 'ok' : 'FAILED:'+JSON.stringify(afterWin)));
     window.infimine.setRandom(null);
   } catch(e) { log('EXC=' + e.message); }
   document.body.insertAdjacentHTML('beforeend','<pre id="t">'+s.join('\n')+'</pre>');
