@@ -33,7 +33,8 @@ const nthOpen = i => { const c = [...document.querySelectorAll('td[data-act="cel
     clickClosed(); //mine - 1 life lost
     clickClosed(); //mine - 2 lives lost
     clickClosed(); //mine - lives gone -> game over
-    log('gameEnded=' + (over() && endLine().includes('END --- Score') ? 'ok' : 'FAILED'));
+    log('gameEnded=' + (over() && endLine().includes('END --- Game over') ? 'ok' : 'FAILED'));
+    log('lossNoScoreShown=' + (!endLine().includes('Score:') && !endLine().includes('NEW BEST') ? 'ok' : 'FAILED:'+endLine().slice(-60)));
     log('bombsRevealed=' + (bombs() > 3 ? 'ok('+bombs()+')' : 'FAILED:'+bombs()+' (only the 3 opened)'));
     log('wrongFlagStruck=' + (markbad()===1 && marks()===0 ? 'ok' : 'FAILED:markbad='+markbad()+' marks='+marks()));
     const anyClosed = document.querySelector('td.cell.shadow') || document.querySelector('td.cell.noplay');

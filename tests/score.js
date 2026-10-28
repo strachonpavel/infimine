@@ -59,8 +59,8 @@ const storedScores = () => { const k = Object.keys(localStorage).filter(x=>x.sta
       c.dispatchEvent(new MouseEvent('click',{bubbles:true}));
     };
     clickClosed(); clickClosed(); clickClosed(); //3 mines -> lives gone -> game over
-    log('lossEndedGame=' + (endLine().includes('END --- Score') ? 'ok' : 'FAILED:'+endLine().slice(0,60)));
-    log('lossShowsScoreLine=' + (endLine().includes('Score:') ? 'ok' : 'FAILED'));
+    log('lossEndedGame=' + (endLine().includes('END --- Game over') ? 'ok' : 'FAILED:'+endLine().slice(0,60)));
+    log('lossShowsNoScore=' + (!endLine().includes('Score:') && !endLine().includes('NEW BEST') ? 'ok' : 'FAILED:'+endLine().slice(-60)));
     log('lossNotRecorded=' + (JSON.stringify(storedScores()) === beforeLoss ? 'ok' : 'FAILED got='+JSON.stringify(storedScores())));
 
     /* F: a loss shows no NEW BEST badge either */

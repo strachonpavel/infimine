@@ -652,9 +652,15 @@ function buildInfo() {
 	s += `<div>${templateItemGame(cg[0], cg[1], null, gk, (fg!=null && fg!==undefined && fg.indexOf(gk)>-1))}</div>`;
 	if (game.inGame===2) {
 		const r = getResult();
-		s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']}, Time: ${formatTime(r['time'])})`
-			+ (newBest.score?' &#9733; NEW BEST SCORE!':'')  //&#9733;
-			+ (newBest.time?' &#9733; NEW BEST TIME!':'') + `</div>`;  //&#9733;
+		//only a finished (won) game shows a score - a loss shows no score at all (and records none)
+		const won = !(game.defaultLives>0 && game.lives<=0); //checkEndCondition only ever ends with lives>0 on a win
+		if (won) {
+			s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']}, Time: ${formatTime(r['time'])})`
+				+ (newBest.score?' &#9733; NEW BEST SCORE!':'')  //&#9733;
+				+ (newBest.time?' &#9733; NEW BEST TIME!':'') + `</div>`;  //&#9733;
+		} else {
+			s += `<div>END --- Game over (Bombs: ${r['bombs']}, Marks: ${r['marks']}, Time: ${formatTime(r['time'])})</div>`;
+		}
 	} else {
 		s += `<div>${((allCellKeys().length>0)?'Running ...':'Click to start')}</div>`;
 	}
