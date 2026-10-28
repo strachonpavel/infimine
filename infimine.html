@@ -248,11 +248,11 @@ table.move tr td {
 <script type="module">
 'use strict';
 
-var game = {};
-var mainProps = {};
-var ui = { showConf: false, markOnClick: false }; // UI state - kept out of the model, merged into the save for compatibility
-var rng = Math.random; //random source used for bombs - injectable for deterministic tests/seeds
-var newBest = { score: false, time: false }; //set when the last result beat the records - shown in the END line
+let game = {};
+let mainProps = {};
+const ui = { showConf: false, markOnClick: false }; // UI state - kept out of the model, merged into the save for compatibility
+let rng = Math.random; //random source used for bombs - injectable for deterministic tests/seeds
+let newBest = { score: false, time: false }; //set when the last result beat the records - shown in the END line
 
 /* storage keys - single source of truth; the exact strings must stay unchanged for compatibility */
 const STORAGE_KEY_GAME = 'game';
@@ -266,9 +266,9 @@ function setRandom(f) {
 
 function Cell(props={}) {
 	
-	var isOpen = props['isOpen']===true?true:false;
-	var hasBomb = props['hasBomb']!==undefined?props['hasBomb']:(rng()<getBombDensity());
-	var bombCount = props['bombCount'];
+	const isOpen = props['isOpen']===true?true:false;
+	const hasBomb = props['hasBomb']!==undefined?props['hasBomb']:(rng()<getBombDensity());
+	const bombCount = props['bombCount'];
 	
 	return {
 		'isOpen': isOpen,
@@ -279,9 +279,9 @@ function Cell(props={}) {
 }
 
 function initDefinition() {
-	var defaultLives = 3;
+	const defaultLives = 3;
 	/* game definition */
-	var g = {
+	const g = {
 		bombDensity: (mainProps['bombDensity']!==undefined)?mainProps['bombDensity']:0.2063, //(() => { return 0.2063; }),//0.2063, //0.1563; 1/8.; //1/16.;
 		canOpenNeighbours: (mainProps['canOpenNeighbours']===false)?false:true,  //bool
 		defaultLives: (mainProps['defaultLives']!==undefined && mainProps['defaultLives']>0)?mainProps['defaultLives']:defaultLives, //null -> infinite - int
@@ -294,14 +294,14 @@ function initDefinition() {
 }
 
 function initValues() {
-	var viewSize = game.spaceSize.slice(0,2).map(x => x!=0?(Math.abs(x)+2):16); //[18,18]; //[5,4], //[16, 30], //16/16  8/8    10/8 
+	const viewSize = game.spaceSize.slice(0,2).map(x => x!=0?(Math.abs(x)+2):16); //[18,18]; //[5,4], //[16, 30], //16/16  8/8    10/8 
 	if (viewSize[0]>25) viewSize[0] = 25;
 	if (viewSize[1]>45) viewSize[1] = 45;
 
-	var viewCenter = initViewCenter(viewSize);
-	var currDimCoord = game.spaceSize.map(x => 0);
+	const viewCenter = initViewCenter(viewSize);
+	const currDimCoord = game.spaceSize.map(x => 0);
 	/* game values */
-	var g = {
+	const g = {
 		field: {},
 		viewSize: (mainProps['viewSize']!==undefined)?mainProps['viewSize']:viewSize,
 		viewCenter: (mainProps['viewCenter']!==undefined)?mainProps['viewCenter']:viewCenter,
@@ -322,11 +322,11 @@ function initValues() {
 
 /* timer - start on the first click, pauseable, frozen at game end, kept in the save */
 function formatTime(ms) {
-	var t = Math.max(0, Math.floor(ms/1000));
-	var h = Math.floor(t/3600);
-	var m = Math.floor((t%3600)/60);
-	var s = t%60;
-	var p = n => (n<10?'0':'')+n;
+	const t = Math.max(0, Math.floor(ms/1000));
+	let h = Math.floor(t/3600);
+	const m = Math.floor((t%3600)/60);
+	let s = t%60;
+	const p = n => (n<10?'0':'')+n;
 	return (h>0)?(h+':'+p(m)+':'+p(s)):(m+':'+p(s));
 }
 
@@ -382,11 +382,11 @@ function timerToggle() {
 	updateView();
 }
 
-var tickerId = null;
+let tickerId = null;
 function startTicker() { //refresh only the time label, never the whole view
 	if (tickerId!==null) return;
 	tickerId = setInterval(function() {
-		var el = document.getElementById('gameTime');
+		const el = document.getElementById('gameTime');
 		if (el) el.textContent = formatTime(getElapsed());
 	}, 1000);
 }
@@ -395,16 +395,16 @@ function getKeyFromStrKey(sk) {
 	return game.viewDim.map(i => sk.split('|').map(Number)[i]);
 }
 function getStrKeyFromKey(k) {
-	var kr = game.currDimCoord.map((v,i) => game.viewDim.find(j => j===i)>=0?k[game.viewDim.findIndex(j => j===i)]:v);
-	var kn = normalizeCoordinates(kr);
+	const kr = game.currDimCoord.map((v,i) => game.viewDim.find(j => j===i)>=0?k[game.viewDim.findIndex(j => j===i)]:v);
+	const kn = normalizeCoordinates(kr);
 	if (kn===null) return null;
 	return kn.reduce((p,n)=>p+'|'+n);
 }
 
 function normalizeCoordinates(p) {
-	var currSpaceSize = game.spaceSize;
-	var out = p.slice(); //pure: never modify the caller's array
-	for (var i in out) {
+	const currSpaceSize = game.spaceSize;
+	const out = p.slice(); //pure: never modify the caller's array
+	for (let i in out) {
 		if (currSpaceSize[i]>0) {
 			//bounded
 			if (out[i]<0) return null;
@@ -419,7 +419,7 @@ function normalizeCoordinates(p) {
 }
 
 function getCell(sk, canBomb=true) {
-	var props = {};
+	let props = {};
 	if (!canBomb) props['hasBomb'] = false;
 	if (!(sk in game.field)) { game.field[sk] = Cell(props) };
 
@@ -442,25 +442,25 @@ const cellIsSeen = c => c['isOpen']===true || c['hasMark']===true;
 
 function getResult() {
 	if (!game) return null;
-	var bo = countWhere(cellIsOpenBomb);
-	var m = countWhere(cellIsMarked);
-	var mp = countWhere(cellIsMarkedBomb);
-	var ccr = (m>0 && mp>0 && game.clickCount>0)?(game.clickCount/mp):Number.MAX_SAFE_INTEGER; //click count
+	const bo = countWhere(cellIsOpenBomb);
+	const m = countWhere(cellIsMarked);
+	const mp = countWhere(cellIsMarkedBomb);
+	const ccr = (m>0 && mp>0 && game.clickCount>0)?(game.clickCount/mp):Number.MAX_SAFE_INTEGER; //click count
 	
-	var lr = ((game.defaultLives>0)?(game.defaultLives-game.lives):0) + 1;
+	const lr = ((game.defaultLives>0)?(game.defaultLives-game.lives):0) + 1;
 	
-	var sc = (1000*ccr*Math.sqrt(lr*(bo+1))).toFixed(0);
+	const sc = (1000*ccr*Math.sqrt(lr*(bo+1))).toFixed(0);
 
 	return {score:sc, bombs:bo, marks:m, time:getElapsed()}; //lower is better: fewer clicks per flag, fewer lives lost, fewer bombs hit
 }
 
 function getBombDensity() {
 	//pure read: derives density from the current state, does not touch it
-	var dens = game.bombDensity;
+	let dens = game.bombDensity;
 	if (game.fixedBombs>0 && game.spaceSize.filter(x => x===null || x===0).length===0) {
-		var s = Math.abs(game.spaceSize.reduce((x,y)=>(x*y)) - allCellKeys().length);
+		let s = Math.abs(game.spaceSize.reduce((x,y)=>(x*y)) - allCellKeys().length);
 		if (s>0) {
-			var b = game.fixedBombs - countWhere(cellHasBomb);
+			let b = game.fixedBombs - countWhere(cellHasBomb);
 			b = b>game.fixedBombs?game.fixedBombs:(b<0?0:b); //normalize
 			dens = b/s;
 			dens = dens>1?1:(dens<0?0:dens);
@@ -472,25 +472,25 @@ function getBombDensity() {
 }
 
 function initViewCenter(viewSize) {
-	var viewDim = game.hasOwnProperty('viewDim')?game.viewDim:[0,1];
+	const viewDim = game.hasOwnProperty('viewDim')?game.viewDim:[0,1];
 	return [parseInt(game.spaceSize[viewDim[0]]/2) - parseInt(viewSize[viewDim[0]]/2), parseInt(game.spaceSize[viewDim[1]]/2) - parseInt(viewSize[viewDim[1]]/2)]; //[0,0];
 }
 
 function getNeighbours(sk) {
-	var n = [];
+	let n = [];
 	const selViewCell = getKeyFromStrKey(sk); //from view
 	const selCell = game.currDimCoord.slice(); //pure: work on a copy, do not move the cursor
 	selCell[game.viewDim[0]] = selViewCell[0];
 	selCell[game.viewDim[1]] = selViewCell[1];
 	
-	var tmp = [];
-	var N = selCell.length;
+	const tmp = [];
+	let N = selCell.length;
 	while (N--) tmp.push([-1,0,1]);
-	var ndc = tmp.reduce((a, b) => a.reduce((r, v) => r.concat(b.map(w => [].concat(v, w))), []));
+	const ndc = tmp.reduce((a, b) => a.reduce((r, v) => r.concat(b.map(w => [].concat(v, w))), []));
 			
 	for (let e of ndc) {
-		var nc = selCell.map((s,i) => s + e[i]);
-		var k = getStrKeyFromKey(nc);
+		const nc = selCell.map((s,i) => s + e[i]);
+		let k = getStrKeyFromKey(nc);
 		if (k==sk) continue;
 		if (k!==null) { n.push(k); }
 	}
@@ -499,42 +499,42 @@ function getNeighbours(sk) {
 }
 
 function getCellBombCount(sk) {
-	var sumPoints = 0;
-	for (var nk of getNeighbours(sk)) {
-		var p = getCell(nk,game.inGame!==0);
+	let sumPoints = 0;
+	for (const nk of getNeighbours(sk)) {
+		const p = getCell(nk,game.inGame!==0);
 		if ('hasBomb' in p && p['hasBomb']===true) sumPoints += 1;
 	}
 	return sumPoints;
 }
 
 function findCellCenterView() {
-	var k = keysWhere(cellIsOpenable);
+	let k = keysWhere(cellIsOpenable);
 
 	if (k.length<=0) {
 		k = keysWhere(cellIsSeen);
 	}
 
 	if (k.length>0) {
-		var fe = k.sort().shift();
-		var centerCell = getKeyFromStrKey(fe);
+		const fe = k.sort().shift();
+		const centerCell = getKeyFromStrKey(fe);
 		game.viewCenter = [centerCell[0] - parseInt(game.viewSize[0]/2), centerCell[1] - parseInt(game.viewSize[1]/2)]
 		updateView();	
 	}
 }
 
 function openCell(sk) {
-	var o = getCell(sk, game.inGame!==0);
+	const o = getCell(sk, game.inGame!==0);
 
 	if (game.canOpenNeighbours===true && o['isOpen']===true && o['hasBomb']===false && o['bombCount']>=0) {
-		var c = 0;
-		var toOpen = [];
-		for (var nk of getNeighbours(sk)) {
-			var p = getCell(nk);
+		let c = 0;
+		const toOpen = [];
+		for (const nk of getNeighbours(sk)) {
+			const p = getCell(nk);
 			if ((p['isOpen']===true && p['hasBomb']===true) || p['hasMark']===true) c += 1;
 			if (p['isOpen']===false && p['hasMark']===false) toOpen.push(nk);
 		}
 		if (c===o['bombCount']) {
-			for (var nk of toOpen) {
+			for (const nk of toOpen) {
 				openCell(nk);
 			}
 		}
@@ -550,7 +550,7 @@ function openCell(sk) {
 		
 		//neighbours
 		if (game.canOpenNeighbours===true && o['bombCount']===0) {
-			for (var nk of getNeighbours(sk)) {
+			for (const nk of getNeighbours(sk)) {
 				openCell(nk);
 			}
 		}
@@ -559,7 +559,7 @@ function openCell(sk) {
 }
 
 function changeMarkCell(sk) {
-	var o = getCell(sk, game.inGame!==0);
+	const o = getCell(sk, game.inGame!==0);
 	if (o['isOpen']===false) {
 		o['hasMark'] = !o['hasMark'];
 		game.field[sk] = o;
@@ -568,9 +568,9 @@ function changeMarkCell(sk) {
 
 function changeDim(d) {
 	if (!([0,1].includes(d))) return;
-	var o = game.viewDim[d];
+	const o = game.viewDim[d];
 	for (let i=1;i<game.spaceSize.length;i++) {
-		var n = (o + i)%game.spaceSize.length;
+		let n = (o + i)%game.spaceSize.length;
 		if (n==o) break;
 		if (n==game.viewDim[(d + 1)%2]) continue;
 		game.viewDim[d] = n;
@@ -589,19 +589,19 @@ function moveInDim(d) {
 
 function buildView() {
 	//ended -> flat gray (noplay); paused -> gray plus visibly quiet cells, a click on the field resumes
-	var s = '<table class="minefield '+((game.inGame===2)?'noplay':((game.timePaused===true)?'paused':''))+'">';
-	for (var r of [...Array(game.viewSize[0]).keys()].map(x => x + game.viewCenter[0])) {
+	let s = '<table class="minefield '+((game.inGame===2)?'noplay':((game.timePaused===true)?'paused':''))+'">';
+	for (const r of [...Array(game.viewSize[0]).keys()].map(x => x + game.viewCenter[0])) {
 		s += '<tr>';
-		for (var c of [...Array(game.viewSize[1]).keys()].map(x => x + game.viewCenter[1])) {
-			var sk = getStrKeyFromKey([r,c]);
-			var vd = '';
-			var cls = 'shadow';
-			var act = (sk===null || game.inGame===2)?'':' data-act="cell" data-key="'+sk+'"';
+		for (let c of [...Array(game.viewSize[1]).keys()].map(x => x + game.viewCenter[1])) {
+			const sk = getStrKeyFromKey([r,c]);
+			let vd = '';
+			let cls = 'shadow';
+			let act = (sk===null || game.inGame===2)?'':' data-act="cell" data-key="'+sk+'"';
 			if (sk===null) {
 				cls = 'noplay';
 			} else if (sk in game.field) {
-				var f = game.field[sk];
-				var opened = (f['isOpen']===true);
+				const f = game.field[sk];
+				const opened = (f['isOpen']===true);
 				//if (field[sk]['isOpen']==true) vd = '.'; //vd += '.'
 				if (f['bombCount']!==undefined) {
 					vd = f['bombCount']>0?f['bombCount']:'';
@@ -623,7 +623,7 @@ function buildView() {
 }
 
 function buildControls() {
-	var s = '<table class="move">' + 
+	let s = '<table class="move">' + 
 			'<tr>' +
 				'<td class="find" title="Find/Center" data-act="find">&#128270;</td>' +  //  &#10687;  &#128270;
 				'<td class="moveView moveUp" title="Move up" data-act="move" data-dir="U">&#x21e7;</td>' +  //U
@@ -645,13 +645,13 @@ function buildControls() {
 }
 
 function buildInfo() {
-	var s = '<div>Mines</div>';
+	let s = '<div>Mines</div>';
 	let gk = getGameKey();
 	let cg = parseGameKey(gk);
 	let fg = favoriteGames();
 	s += `<div>${templateItemGame(cg[0], cg[1], null, gk, (fg!=null && fg!==undefined && fg.indexOf(gk)>-1))}</div>`;
 	if (game.inGame===2) {
-		var r = getResult();
+		const r = getResult();
 		s += `<div>END --- Score: ${r['score']} (Bombs: ${r['bombs']}, Marks: ${r['marks']}, Time: ${formatTime(r['time'])})`
 			+ (newBest.score?' &#9733; NEW BEST SCORE!':'')  //&#9733;
 			+ (newBest.time?' &#9733; NEW BEST TIME!':'') + `</div>`;  //&#9733;
@@ -693,7 +693,7 @@ function buildConfig() {
 }
 
 function buildConfTabs() {
-	var s = '';
+	let s = '';
 	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfNewGame" id="defaultConfTab">New Game</button>`;
 	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfSaveLoad">Save/Load</button>`;
 	s += `<button class="conftablinks" data-act="conftab" data-tab="ConfBestScore">Best Score</button>`;
@@ -703,7 +703,7 @@ function buildConfTabs() {
 }
 
 function buildConfNewGame() {
-	var s = '<div id="ConfNewGame" class="conftabcontent">';
+	let s = '<div id="ConfNewGame" class="conftabcontent">';
 	s += '<h3>New Game</h3>'; 
 	s += '<p>'; 
 	s += '<h4>Favorites</h4>'; 
@@ -711,7 +711,7 @@ function buildConfNewGame() {
 	let fg = favoriteGames();
 	if (fg) {
 		for (let q of fg) {
-			var g = parseGameKey(q);
+			const g = parseGameKey(q);
 			s += '<li>'+templateItemGame(g[0], g[1], null, q, true)+'</li>';
 		}
 	}
@@ -720,7 +720,7 @@ function buildConfNewGame() {
 	s += '<ul>';
 	for (let q of quickStartGames()) {
 		if (q) {
-			var qn = parseGameKey(q);
+			const qn = parseGameKey(q);
 			s += '<li>'+templateItemGame(qn[0], qn[1], null, null, null)+'</li>';
 		} else {
 			s += '<hr>';
@@ -743,7 +743,7 @@ function buildConfNewGame() {
 }
 
 function buildConfSaveLoad() {
-	var s = '<div id="ConfSaveLoad" class="conftabcontent">';
+	let s = '<div id="ConfSaveLoad" class="conftabcontent">';
 	s += '<h3>Save/Load</h3>'; 
 	s += '<p>'; 
 	s += '<input type="button" name="save" title="Save the game" value="Save" data-act="save">';
@@ -762,13 +762,13 @@ function buildConfSaveLoad() {
 }
 
 function buildConfBestScore() {
-	var s = '<div id="ConfBestScore" class="conftabcontent">';
+	let s = '<div id="ConfBestScore" class="conftabcontent">';
 	s += '<h3>Best Score</h3>'; 
 	s += '<p>'; 
 	s += '<table><tr><td title="Lower is better">Score</td><td>Time</td><td>Date</td></tr>';
 	for (let i of getBestScoreList(getGameKey())) {
 		//records from before the timer (4b) have no time - show a dash
-		var rt = (i[1] && typeof i[1]['time']==='number')?formatTime(i[1]['time']):'&ndash;';
+		const rt = (i[1] && typeof i[1]['time']==='number')?formatTime(i[1]['time']):'&ndash;';
 		s += `<tr><td>${i[0]}</td><td>${rt}</td><td>${(new Date(i[2])).toLocaleString()}</td></tr>`;
 	}
 	s += '</table>';
@@ -779,7 +779,7 @@ function buildConfBestScore() {
 }
 
 function buildConfPlayedGames() {
-	var s = '<div id="ConfPlayedGames" class="conftabcontent">';
+	let s = '<div id="ConfPlayedGames" class="conftabcontent">';
 	s += '<h3>Played Games</h3>'; 
 	s += '<p>'; 
 	s += '<ul>'; 
@@ -794,7 +794,7 @@ function buildConfPlayedGames() {
 }
 
 function buildConfInfo() {
-	var s = '<div id="ConfInfo" class="conftabcontent">';
+	let s = '<div id="ConfInfo" class="conftabcontent">';
 	s += '<h3>Info</h3>'; 
 	s += '<p>'; 
 	s += '<h4>Instructions</h4>';
@@ -828,10 +828,10 @@ function buildConfInfo() {
 
 function updateView() {
 	//pure render: reads the model, never modifies it (end condition is checked by the action handlers)
-	var el = document.getElementById('infimine');
+	const el = document.getElementById('infimine');
 	
-	var s = '';
-	for (var b of [buildInfo, buildControls, buildConfig]) {
+	let s = '';
+	for (let b of [buildInfo, buildControls, buildConfig]) {
 		s += b();
 	}
 	
@@ -840,7 +840,7 @@ function updateView() {
 
 function checkEndCondition() {
 	if (game.inGame==2) return true;
-	var openBomb = countWhere(cellIsOpenBomb);
+	const openBomb = countWhere(cellIsOpenBomb);
 	game.lives = game.defaultLives - openBomb;
 	game.lives = game.lives>0?game.lives:0;
 	if (game.defaultLives>0 && game.lives<=0) { 
@@ -849,7 +849,7 @@ function checkEndCondition() {
 		setBestScoreList();
 	} //end
 	
-	var leftOpen = countWhere(cellIsOpenable);
+	const leftOpen = countWhere(cellIsOpenable);
 	if (allCellKeys().length>0 && leftOpen<=0) {
 		game.inGame = 2;
 		timerFreeze();
@@ -876,9 +876,9 @@ function clickCell(ev,el) {
 }
 
 function newGame(gd) {
-	var s = gd.split('_').map(Number);
+	let s = gd.split('_').map(Number);
 	if (s.length==4 && s[3]>0) {
-		var props = {spaceSize: [s[0],s[1]], viewCenter: [-1,-1]};
+		let props = {spaceSize: [s[0],s[1]], viewCenter: [-1,-1]};
 		if (s[0]!=0 && s[1]!=0 && s[3]>1) {
 			props['fixedBombs'] = parseInt(s[3]);
 		} else {
@@ -892,44 +892,44 @@ function newGame(gd) {
 }
 
 function myNewGame() {
-	var hi = document.getElementById('ngSpaceHi').checked;
-	var wi = document.getElementById('ngSpaceWi').checked;
-	var h = 0, w = 0; //infinity
+	const hi = document.getElementById('ngSpaceHi').checked;
+	const wi = document.getElementById('ngSpaceWi').checked;
+	let h = 0, w = 0; //infinity
 	if (!hi) {
 		h = parseInt(document.getElementById('ngSpaceH').value);
 		h = isNaN(h)?0:h;
 		if (h<=0) { return showMessage('Space Height: must be > 1');} 
-		var hc = document.getElementById('ngSpaceHc').checked;
+		const hc = document.getElementById('ngSpaceHc').checked;
 		if (hc) h = -h;
 	}
 	if (!wi) {
 		w = parseInt(document.getElementById('ngSpaceW').value);
 		w = isNaN(w)?0:w;
 		if (w<=0) { return showMessage('Space Width: must be > 1'); }
-		var wc = document.getElementById('ngSpaceWc').checked;
+		const wc = document.getElementById('ngSpaceWc').checked;
 		if (wc) w = -w;
 	}
 	
 		
-	var l = parseInt(document.getElementById('ngLives').value);
+	let l = parseInt(document.getElementById('ngLives').value);
 	l = isNaN(l)?0:l;
 	if (l<0 || l>5) { return showMessage('Lives: must be in range 0-5 (0=infinity)'); }
-	var bd = parseFloat(document.getElementById('ngBombDensity').value)/100.0; //%
+	let bd = parseFloat(document.getElementById('ngBombDensity').value)/100.0; //%
 	bd = (isNaN(bd)?0:bd).toFixed(4);
-	var b = 0;
+	let b = 0;
 	if (h!=0 && w!=0) {
 		b = parseInt(document.getElementById('ngBombs').value);
 		b = isNaN(b)?0:b;
 		if (b<=0 && bd==0) { return showMessage('Bombs: must be > 0'); }
 	}
 
-	var gd = h+'_'+w+'_'+l+'_'+(b>0?b:bd);
+	const gd = h+'_'+w+'_'+l+'_'+(b>0?b:bd);
 	newGame(gd);
 }
 
 /* --- event delegation: one listener per event type on the root element --- */
 function onRootClick(ev) {
-	var el = ev.target.closest('[data-act]');
+	const el = ev.target.closest('[data-act]');
 	if (el===null) return;
 	switch (el.dataset.act) {
 		case 'cell': clickCell(ev, el); break;
@@ -958,13 +958,13 @@ function onRootClick(ev) {
 
 function onRootContextMenu(ev) {
 	ev.preventDefault(); //no browser menu inside the game
-	var el = ev.target.closest('[data-act="cell"]');
+	const el = ev.target.closest('[data-act="cell"]');
 	if (el!==null) clickCell(ev, el);
 }
 
 function onRootMouseMove(ev) {
 	if (!ev.ctrlKey) return;
-	var el = ev.target.closest('[data-act="move"]');
+	const el = ev.target.closest('[data-act="move"]');
 	if (el!==null) moveViewBy(el.dataset.dir);
 }
 
@@ -975,7 +975,7 @@ function onVisibilityChange() {
 }
 
 function installEventListeners() {
-	var root = document.getElementById('infimine');
+	const root = document.getElementById('infimine');
 	root.addEventListener('click', onRootClick);
 	root.addEventListener('contextmenu', onRootContextMenu);
 	root.addEventListener('mousemove', onRootMouseMove);
@@ -992,7 +992,7 @@ function onKeyDownEvent(ev) {
 }
 
 function moveViewBy(dir) {
-	var delta = [0,0];
+	let delta = [0,0];
 	if (dir==='U') { 
 		delta = [-1,0];
 	} else if (dir==='R') {
@@ -1010,8 +1010,8 @@ function moveViewBy(dir) {
 }
 
 function changeViewSize(newH, newW) {
-	var h = newH===undefined?parseInt(document.getElementById('viewH').value):parseInt(newH);
-	var w = newW===undefined?parseInt(document.getElementById('viewW').value):parseInt(newW);
+	let h = newH===undefined?parseInt(document.getElementById('viewH').value):parseInt(newH);
+	let w = newW===undefined?parseInt(document.getElementById('viewW').value):parseInt(newW);
 	h = isNaN(h)?0:h;
 	w = isNaN(w)?0:w;
 	if (h>0 && h<=99 && w>0 && w<=99) {
@@ -1031,7 +1031,7 @@ function toggleConfig() {
 	ui.showConf = !ui.showConf;
 	updateView();
 	
-	var t = document.getElementById("defaultConfTab");
+	const t = document.getElementById("defaultConfTab");
 	if (t!=null) { t.click(); }
 }
 
@@ -1056,7 +1056,7 @@ function storageKeys() {
 function parseJSONSafe(s, fallback) {
 	if (!s) return fallback;
 	try {
-		var v = JSON.parse(s);
+		const v = JSON.parse(s);
 		return (v===undefined || v===null) ? fallback : v;
 	} catch(e) { return fallback; }
 }
@@ -1082,24 +1082,24 @@ function getGameKey() {
 }
 
 function parseGameKey(k) {
-	var p = parseJSONSafe(k, null);
+	const p = parseJSONSafe(k, null);
 	if (!Array.isArray(p) || !Array.isArray(p[0])) return ['Unknown game', ''];
-	var s = 'Space Size: ' + ((p[0][0]!=0)?(Math.abs(p[0][0]) + (p[0][0]<0?('(cyklic)'):'')):'infinite') + '/' + ((p[0][1]!=0)?(Math.abs(p[0][1]) + (p[0][1]<0?('(cyklic)'):'')):'infinite');
+	let s = 'Space Size: ' + ((p[0][0]!=0)?(Math.abs(p[0][0]) + (p[0][0]<0?('(cyklic)'):'')):'infinite') + '/' + ((p[0][1]!=0)?(Math.abs(p[0][1]) + (p[0][1]<0?('(cyklic)'):'')):'infinite');
 	s += ', Lives: ' + (p[1]>0?p[1]:'infinite');
 	if (parseFloat(p[2])>1) {
 		s += ', Bombs: ' + parseInt(p[2]);
 	} else {
 		s += ', Bomb Density: ' + (100*parseFloat(p[2])).toFixed(2) + '%';
 	}
-	var ng = parseInt(p[0][0]) + '_' + parseInt(p[0][1]) + '_' + (parseInt(p[1])>0?p[1]:'') + '_' + ((parseFloat(p[2])>0)?p[2]:'');
+	const ng = parseInt(p[0][0]) + '_' + parseInt(p[0][1]) + '_' + (parseInt(p[1])>0?p[1]:'') + '_' + ((parseFloat(p[2])>0)?p[2]:'');
 	
 	return [s,ng]
 	
 }
 
 function compareScoreEntries(x, y) {
-	var sx = parseInt(x[0]);
-	var sy = parseInt(y[0]);
+	const sx = parseInt(x[0]);
+	const sy = parseInt(y[0]);
 	if (sx !== sy) return sx - sy; //lower score is better - the best one comes first
 	return (new Date(x[2])) - (new Date(y[2])); //older date first on ties
 }
@@ -1135,11 +1135,11 @@ function resetBestScoreList() {
 }
 
 function bestScoreListGames() {
-	var gmsl = storageKeys()
+	const gmsl = storageKeys()
 		.filter(x => x.startsWith(STORAGE_KEY_BEST_SCORE_PREFIX))
 		.map(function (x) {
-			var k = x.substring(STORAGE_KEY_BEST_SCORE_PREFIX.length);
-			var gk = parseGameKey(k);
+			let k = x.substring(STORAGE_KEY_BEST_SCORE_PREFIX.length);
+			const gk = parseGameKey(k);
 			return {
 				key: k,
 				name: gk[0],
@@ -1203,12 +1203,12 @@ function load() { //returns true when a saved game was loaded
 }
 
 function downloadText(filename, text) {
-	var contentType = 'application/json';
-	var content = new Blob([text], {type: contentType});
+	const contentType = 'application/json';
+	const content = new Blob([text], {type: contentType});
 	if (window.navigator.msSaveOrOpenBlob) // IE10+
 		window.navigator.msSaveOrOpenBlob(content, filename);
 	else { // Others
-		var a = document.createElement("a"), url = URL.createObjectURL(content);
+		let a = document.createElement("a"), url = URL.createObjectURL(content);
 		a.href = url;
 		a.download = filename;
 		document.body.appendChild(a);
@@ -1226,24 +1226,24 @@ function saveToDisk() {
 
 function exportStorageData() {
 	//backup of everything the game keeps: scores, favorites, last game, the saved game
-	var data = {};
+	const data = {};
 	for (let k of managedStorageKeys()) {
-		var v = storageGet(k);
+		const v = storageGet(k);
 		if (v!==null) data[k] = v;
 	}
 	downloadText('infimine.storage', JSON.stringify({format:'infimine-storage', version:1, exportedAt:new Date().toISOString(), data:data}));
 }
 
 function importStorageData() {
-	var files = document.getElementById('importStorageFile').files;
+	const files = document.getElementById('importStorageFile').files;
 	if (files.length <= 0) return false;
-	var fr = new FileReader();
+	const fr = new FileReader();
 	fr.onload = function(e) {
 		if (!e.target.result) return;
 		try {
-			var d = parseJSONSafe(e.target.result, null);
+			const d = parseJSONSafe(e.target.result, null);
 			if (!d || typeof d['data']!=='object' || d['data']===null || Array.isArray(d['data'])) { throw new Error('not a storage file'); }
-			var n = 0;
+			let n = 0;
 			for (let k of Object.keys(d['data'])) {
 				//only keys the game owns are imported, and only as strings (checked by name - the local storage may be empty)
 				if (!isManagedStorageKey(k) || typeof d['data'][k]!=='string') continue;
@@ -1261,21 +1261,21 @@ function importStorageData() {
 }
 
 function loadFromDisk() {
-	var files = document.getElementById('loadDiskFile').files;
+	const files = document.getElementById('loadDiskFile').files;
 	if (files.length <= 0) return false;
-	var fr = new FileReader();
+	const fr = new FileReader();
 	fr.onload = function(e) { 
 		if (e.target.result) {
 			try {
 				
-				var d = parseJSONSafe(e.target.result, null);
+				const d = parseJSONSafe(e.target.result, null);
 				if (!isValidGame(d)) { throw new Error('invalid game'); }
 				mainProps = {};
 				for (let k of ['bombDensity', 'canOpenNeighbours', 'defaultLives', 'spaceSize', 'fixedBombs', 'viewSize', 'viewCenter']) {
 					if (d[k]!==undefined) { mainProps[k] = d[k]; }
 				}
 				game  = initDefinition();
-				var gv = initValues();
+				const gv = initValues();
 				game = Object.assign({}, game, gv);
 
 				for (let k of ['field', 'viewDim', 'currDimCoord', 'inGame', 'lives', 'clickCount', 'timeElapsed', 'timePaused', 'timeStarted']) {
@@ -1298,12 +1298,12 @@ function loadFromDisk() {
 }
 
 function openConfTab(tabName, btn) {
-	var tabcontent = document.getElementsByClassName("conftabcontent");
+	const tabcontent = document.getElementsByClassName("conftabcontent");
 	for (let i = 0; i < tabcontent.length; i++) {
 		tabcontent[i].style.display = "none";
 	}
 
-	var tablinks = document.getElementsByClassName("conftablinks");
+	const tablinks = document.getElementsByClassName("conftablinks");
 	for (let i = 0; i < tablinks.length; i++) {
 		tablinks[i].className = tablinks[i].className.replace(" active", "");
 	}
@@ -1334,7 +1334,7 @@ function restart() {
 	ui.showConf = false; //a fresh game starts with a clean UI state (as initValues did before)
 	ui.markOnClick = false;
 	newBest = { score: false, time: false }; //no badges until the new game ends
-	var gv = initValues();
+	const gv = initValues();
 	game = Object.assign({}, game, gv);
 	updateView();	
 
@@ -1344,9 +1344,9 @@ function restart() {
 
 function showMessage(m) {
 	console.log(m);
-	var old = document.getElementById('infimine-message');
+	const old = document.getElementById('infimine-message');
 	if (old) { old.remove(); }
-	var el = document.createElement('div');
+	const el = document.createElement('div');
 	el.id = 'infimine-message';
 	el.className = 'message';
 	el.textContent = m;
