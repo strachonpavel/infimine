@@ -86,6 +86,7 @@ run "auto-save + auto-restore + tab pause" autosave autosave.js
 run "end of game reveal (mines, wrong flags)" end endreveal.js
 run "dark theme (media query)" dark darkmode.js
 run "disk load" disk diskload.js
+run "storage export/import" sio storage_io.js
 run "poisoned storage" rob robust.js
 
 # 3) static guards

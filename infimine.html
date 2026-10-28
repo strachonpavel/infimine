@@ -752,6 +752,10 @@ function buildConfSaveLoad() {
 	s += '<input type="button" name="saveDisk" title="Save the game to disk" value="Save To Disk" data-act="savedisk">';
 	s += '<input type="button" name="loadDisk" title="Load the game from disk" value="Load From Disk" data-act="loaddisk">';
 	s += '<input type="file" id="loadDiskFile" name="loadDiskFile" title="Choose the file from disk" value="infimine.save">';
+	s += '<br>';
+	s += '<input type="button" name="exportStorage" title="Export scores, favorites and saved game to a file" value="Export Storage" data-act="exportstorage">';
+	s += '<input type="button" name="importStorage" title="Import the storage from a file" value="Import Storage" data-act="importstorage">';
+	s += '<input type="file" id="importStorageFile" name="importStorageFile" title="Choose the storage file" value="infimine.storage">';
 	s += '</p>'; 
 	s += '</div>';
 	return s;
@@ -943,6 +947,8 @@ function onRootClick(ev) {
 		case 'load': load(); break;
 		case 'savedisk': saveToDisk(); break;
 		case 'loaddisk': loadFromDisk(); break;
+		case 'exportstorage': exportStorageData(); break;
+		case 'importstorage': importStorageData(); break;
 		case 'resetscore': resetBestScoreList(); break;
 		case 'viewsize': changeViewSize(); break;
 		case 'changedim': changeDim(parseInt(el.dataset.dim)); break;
@@ -1053,6 +1059,16 @@ function parseJSONSafe(s, fallback) {
 		var v = JSON.parse(s);
 		return (v===undefined || v===null) ? fallback : v;
 	} catch(e) { return fallback; }
+}
+
+function isManagedStorageKey(k) {
+	//the keys this game owns - export/import must never touch anything else in the shared origin storage
+	return (k===STORAGE_KEY_GAME || k===STORAGE_KEY_LAST_GAME
+		|| k===STORAGE_KEY_FAVORITES || k.startsWith(STORAGE_KEY_BEST_SCORE_PREFIX));
+}
+
+function managedStorageKeys() {
+	return storageKeys().filter(isManagedStorageKey);
 }
 
 function isValidGame(d) {
@@ -1186,11 +1202,9 @@ function load() { //returns true when a saved game was loaded
 	return true;
 }
 
-function saveToDisk() {
-	//var contentType = 'text/plain';
+function downloadText(filename, text) {
 	var contentType = 'application/json';
-	var filename = 'infimine.save';
-	var content = new Blob([serializeGame()], {type: contentType});
+	var content = new Blob([text], {type: contentType});
 	if (window.navigator.msSaveOrOpenBlob) // IE10+
 		window.navigator.msSaveOrOpenBlob(content, filename);
 	else { // Others
@@ -1204,6 +1218,46 @@ function saveToDisk() {
 			window.URL.revokeObjectURL(url);  
 		}, 0); 
 	}
+}
+
+function saveToDisk() {
+	downloadText('infimine.save', serializeGame());
+}
+
+function exportStorageData() {
+	//backup of everything the game keeps: scores, favorites, last game, the saved game
+	var data = {};
+	for (let k of managedStorageKeys()) {
+		var v = storageGet(k);
+		if (v!==null) data[k] = v;
+	}
+	downloadText('infimine.storage', JSON.stringify({format:'infimine-storage', version:1, exportedAt:new Date().toISOString(), data:data}));
+}
+
+function importStorageData() {
+	var files = document.getElementById('importStorageFile').files;
+	if (files.length <= 0) return false;
+	var fr = new FileReader();
+	fr.onload = function(e) {
+		if (!e.target.result) return;
+		try {
+			var d = parseJSONSafe(e.target.result, null);
+			if (!d || typeof d['data']!=='object' || d['data']===null || Array.isArray(d['data'])) { throw new Error('not a storage file'); }
+			var n = 0;
+			for (let k of Object.keys(d['data'])) {
+				//only keys the game owns are imported, and only as strings (checked by name - the local storage may be empty)
+				if (!isManagedStorageKey(k) || typeof d['data'][k]!=='string') continue;
+				storageSet(k, d['data'][k]);
+				n += 1;
+			}
+			if (n<=0) { throw new Error('nothing importable'); }
+			showMessage('Imported '+n+' entries');
+			updateView(); //scores/favorites show up right away; the game itself is restored by Load
+		} catch(er) {
+			showMessage('Import failed - not a storage file');
+		}
+	}
+	fr.readAsText(files.item(0));
 }
 
 function loadFromDisk() {
