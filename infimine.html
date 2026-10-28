@@ -21,6 +21,11 @@ table.noplay {
 	background-color: lightgray;
 }
 
+/* game over: the cells are not clickable any more */
+table.minefield.noplay tr td {
+	cursor: default;
+}
+
 /* paused: the field is frozen - grayed like game over, but the cells visibly quiet down
    (clicking the field ends the pause) */
 table.minefield.paused {
@@ -90,6 +95,13 @@ table.minefield tr td {
 .bomb {
   color: Black;
   background-color: silver; /*red;*/
+}
+
+/* game over: a flagged cell without a mine - struck out */
+.markbad {
+  color: darkred;
+  background-color: lightsalmon;
+  text-decoration: line-through;
 }
 
 .shadow {
@@ -509,13 +521,19 @@ function buildView() {
 			if (sk===null) {
 				cls = 'noplay';
 			} else if (sk in game.field) {
+				var f = game.field[sk];
+				var opened = (f['isOpen']===true);
 				//if (field[sk]['isOpen']==true) vd = '.'; //vd += '.'
-				if (game.field[sk]['bombCount']!==undefined) {
-					vd = game.field[sk]['bombCount']>0?game.field[sk]['bombCount']:'';
-					cls = 'color'+game.field[sk]['bombCount'];
+				if (f['bombCount']!==undefined) {
+					vd = f['bombCount']>0?f['bombCount']:'';
+					cls = 'color'+f['bombCount'];
 				}
-				if (game.field[sk]['hasMark']==true && game.field[sk]['isOpen']==false) { vd = '&#9873;'; cls = 'mark'; };  //M  &#127987   &#128681 &#9873;
-				if (game.field[sk]['hasBomb']==true && game.field[sk]['isOpen']==true) { vd = '&#128165;'; cls = 'bomb'; }; //*  &#128163; &#128165;
+				if (game.inGame===2 && opened===false && f['hasBomb']===true && f['hasMark']!==true) { vd = '&#128165;'; cls = 'bomb'; } //game over: the mines that are still closed get revealed
+				if (f['hasMark']==true && opened===false) {
+					if (game.inGame===2 && f['hasBomb']===false) { vd = '&#10060;'; cls = 'markbad'; } //game over: a wrong flag is struck out
+					else { vd = '&#9873;'; cls = 'mark'; }  //M  &#127987   &#128681 &#9873;  (a correct flag stays a flag)
+				}
+				if (f['hasBomb']==true && opened===true) { vd = '&#128165;'; cls = 'bomb'; }; //*  &#128163; &#128165;
 			}
 			s += '<td class="cell '+cls+'"'+act+'>&nbsp;'+vd+'&nbsp;</td>';
 		}	
