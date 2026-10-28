@@ -83,6 +83,7 @@ run "timer (start, pause, save, end)" timer timer.js
 run "score (lower is better)" score score.js
 run "auto-save + auto-restore + tab pause" autosave autosave.js
 run "end of game reveal (mines, wrong flags)" end endreveal.js
+run "dark theme (media query)" dark darkmode.js
 run "disk load" disk diskload.js
 run "poisoned storage" rob robust.js
 

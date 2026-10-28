@@ -163,6 +163,84 @@ table.move tr td {
   display: none;
 }
 
+/* dark theme - automatic, follows the system setting; the same palette steps, just lifted for dark backgrounds */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #1c1e22;
+    color: #d8d8d8;
+  }
+  table.minefield {
+    background-color: #2a2d31;
+    border-color: #555a60;
+  }
+  table.noplay {
+    background-color: #34383d;
+  }
+  table.minefield tr td {
+    border-color: #555a60;
+  }
+  .color0 {
+    color: #2a2d31; /* stays invisible on an opened cell, like in the light theme */
+  }
+  .color1 {
+    color: #8FB8DA;
+  }
+  .color2 {
+    color: #85C485;
+  }
+  .color3 {
+    color: #F07E68;
+  }
+  .color4 {
+    color: #ADA6CE;
+  }
+  .color5 {
+    color: #E0A377;
+  }
+  .color6 {
+    color: #B6CFE6;
+  }
+  .color7 {
+    color: #E87BE8;
+  }
+  .color8 {
+    color: #F2CE5B;
+  }
+  .color9 {
+    color: #CFCFCF;
+  }
+  .mark {
+    color: #1c1e22;
+    background-color: #E59A2F;
+  }
+  .markbad {
+    color: #FF9E8A;
+    background-color: #5A2A2A;
+  }
+  .bomb {
+    color: #1c1e22;
+    background-color: #9AA0A6;
+  }
+  .shadow {
+    color: #d8d8d8;
+    background-color: #4A4F55;
+  }
+  .marker-on {
+    background-color: #E59A2F;
+  }
+  .cell.noplay {
+    background-color: #3A3E43;
+    border-color: #6a6f75;
+  }
+  table.move tr td {
+    border-color: #555a60;
+  }
+  .message {
+    background-color: #d8d8d8;
+    color: #1c1e22;
+  }
+}
+
 </style>
 </head>
 <body>
